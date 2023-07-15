@@ -71,7 +71,7 @@
 #if SODI_DVT_WAKEUP
 #define WAKE_SRC_FOR_SODI WAKE_SRC_EINT	/* WAKE_SRC_GPT | WAKE_SRC_EINT */
 #else
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
 	WAKE_SRC_CCIF0_MD | WAKE_SRC_CCIF1_MD | WAKE_SRC_CONN2AP | \
@@ -124,7 +124,7 @@ enum spm_sodi_step {
 };
 #endif
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 static const u32 sodi_binary_rev00[] = {
 	0x814e0001, 0xd8200405, 0x17c07c1f, 0x18c0001f, 0x102135cc, 0x1910001f,
 	0x102135cc, 0x813f8404, 0xe0c00004, 0x1910001f, 0x102135cc, 0x81411801,
@@ -1184,7 +1184,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 #ifdef SPM_VCORE_EN
 	/* If Vcore DVFS is disable, force to disable SODI internal Vcore DVS */
 	if (pwrctrl->pcm_flags_cust == 0) {
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M)
 		if ((pwrctrl->pcm_flags & SPM_VCORE_DVFS_EN) == 0)
 			pwrctrl->pcm_flags |= SPM_VCORE_DVS_EVENT_DIS;
 #else
@@ -1249,7 +1249,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 
 	__spm_init_event_vector(pcmdesc);
 
-#if defined(CONFIG_ARCH_MT6735) ||  defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) ||  defined(CONFIG_ARCH_MT6753)
 /* In MT6735M, do not set apsrc_req bit in SODI. */
 	/* Display set SPM_PCM_SRC_REQ[0]=1'b1 to force DRAM not enter self-refresh mode */
 	if ((spm_read(SPM_PCM_SRC_REQ) & 0x00000001))

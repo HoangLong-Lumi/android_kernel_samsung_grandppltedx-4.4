@@ -11,7 +11,7 @@
 # GNU General Public License for more details.
 #
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/mt6735/
 endif
 ifeq ($(CONFIG_ARCH_MT6735M),y)

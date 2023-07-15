@@ -24,7 +24,7 @@
 
 #####################################
 # MT67xx chipset group
-#obj-$(CONFIG_ARCH_MT6735) += IPv1/
+#obj-$(CONFIG_MACH_MT6735) += IPv1/
 #obj-$(CONFIG_ARCH_MT6580) += IPv1/
 #obj-$(CONFIG_ARCH_MT6755) += IPv1/
 
@@ -41,7 +41,7 @@ obj-$(CONFIG_MTK_FB) += 			\
 				mtkfb_fence.o \
 				fbconfig_kdebug.o
 
-ifeq (y, $(filter y, $(CONFIG_ARCH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580)))
+ifeq (y, $(filter y, $(CONFIG_MACH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580)))
 obj-$(CONFIG_MTK_FB) += mtkfb.o
 endif
 
@@ -49,7 +49,7 @@ ifeq (y, $(filter y, $(CONFIG_ARCH_MT6797)))
 obj-y += color20/
 endif
 
-ifeq (y, $(filter y, $(CONFIG_ARCH_MT6797) $(CONFIG_ARCH_MT6755) $(CONFIG_ARCH_MT6752) $(CONFIG_ARCH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580)))
+ifeq (y, $(filter y, $(CONFIG_ARCH_MT6797) $(CONFIG_ARCH_MT6755) $(CONFIG_ARCH_MT6752) $(CONFIG_MACH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580)))
 obj-y += aal20/
 obj-y += corr10/
 endif
@@ -59,13 +59,13 @@ obj-y += od10/
 endif
 
 # Todo: newer chip
-ifeq (y, $(filter y, $(CONFIG_ARCH_MT6752) $(CONFIG_ARCH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580) $(CONFIG_ARCH_MT6795) $(CONFIG_ARCH_MT6595)))
+ifeq (y, $(filter y, $(CONFIG_ARCH_MT6752) $(CONFIG_MACH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580) $(CONFIG_ARCH_MT6795) $(CONFIG_ARCH_MT6595)))
 obj-y += rdma10/
 obj-y += wdma10/
 endif
 # Todo: newer chip
 
-ifeq (y, $(filter y, $(CONFIG_ARCH_MT6755) $(CONFIG_ARCH_MT6752) $(CONFIG_ARCH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580) $(CONFIG_ARCH_MT6795) $(CONFIG_ARCH_MT6595)))
+ifeq (y, $(filter y, $(CONFIG_ARCH_MT6755) $(CONFIG_ARCH_MT6752) $(CONFIG_MACH_MT6735) $(CONFIG_ARCH_MT6735M) $(CONFIG_ARCH_MT6753) $(CONFIG_ARCH_MT6580) $(CONFIG_ARCH_MT6795) $(CONFIG_ARCH_MT6595)))
 obj-y += color20/
 endif
 
@@ -89,7 +89,7 @@ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM) \
 
 ccflags-$(CONFIG_MTK_LCM) += -I$(srctree)/drivers/misc/mediatek/lcm/inc
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys/mt6735/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox/mt6735/
 endif

@@ -17,7 +17,7 @@
 #define MOD_NO_IN_1_DEVAPC                  16
 #define DEVAPC_TAG                          "DEVAPC"
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	/*For EMI API DEVAPC0_D0_VIO_STA_3, idx:124*/
 	#define ABORT_EMI                0x10000000
 #elif defined(CONFIG_ARCH_MT6735M)
@@ -39,7 +39,7 @@
 #define DEVAPC_DOMAIN_CONN      2
 #define DEVAPC_DOMAIN_MD32      3
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 #define DEVAPC_DOMAIN_MM        4
 #define DEVAPC_DOMAIN_MD3       5
@@ -83,7 +83,7 @@
 #define DEVAPC0_D2_APC_0            (devapc_ao_base+0x0200)
 #define DEVAPC0_D3_APC_0            (devapc_ao_base+0x0300)
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 #define DEVAPC0_D4_APC_0            (devapc_ao_base+0x0400)
 #define DEVAPC0_D5_APC_0            (devapc_ao_base+0x0500)

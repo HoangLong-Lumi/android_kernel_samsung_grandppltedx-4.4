@@ -164,7 +164,7 @@
 #define SR_CCIF1_TO_AP_MASK_B	(1U << 5)
 
 #ifndef CONFIG_MTK_FPGA
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 #define SPM_VCORE_EN
 #endif
 #endif
@@ -375,7 +375,7 @@ static inline u32 base_va_to_pa(const u32 *base)
 static inline void set_pwrctrl_pcm_flags(struct pwr_ctrl *pwrctrl, u32 flags)
 {
 #ifndef CONFIG_MTK_FPGA
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #elif defined(CONFIG_ARCH_MT6735M)
 #elif defined(CONFIG_ARCH_MT6753)
 	if (is_ext_buck_exist())

@@ -14,7 +14,7 @@
 #ifndef _MT_VCORE_DVFS_
 #define _MT_VCORE_DVFS_
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #include "mt_vcore_dvfs_1.h"
 #endif
 

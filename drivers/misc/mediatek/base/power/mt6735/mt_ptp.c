@@ -481,7 +481,7 @@ struct ptp_devinfo {
 	unsigned int CPU_MTDES:8;
 	unsigned int CPU_AGEDELTA:8;
 	/* M_HW_RES2 10206188 */
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 	unsigned int SOC_VOLTBIN:2;
 	unsigned int LTE_VOLTBIN:2;
 	unsigned int GPU_BDES:4;
@@ -611,7 +611,7 @@ static struct ptp_det ptp_detectors[NR_PTP_DET] = {
 			 .ops = &cpu_det_ops,
 			 .ctrl_id = PTP_CTRL_CPU,
 			 .features = FEA_INIT01 | FEA_INIT02 | FEA_MON,
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 			 .max_freq_khz = 1300000,
 #else
 #ifdef CONFIG_ARCH_MT6753

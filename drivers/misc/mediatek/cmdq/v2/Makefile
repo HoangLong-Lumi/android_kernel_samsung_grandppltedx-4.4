@@ -31,7 +31,7 @@ endif
 # Common Clock Framework
 ifneq ($(CONFIG_MTK_CLKMGR),y)
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -DCMDQ_USE_CCF
 endif
 

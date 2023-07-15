@@ -172,7 +172,7 @@ static struct platform_device mt_usb_device = {
 MODULE_DEVICE_TABLE(of, apusb_of_ids);
 
 #ifndef FPGA_PLATFORM
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 #include "mt_vcore_dvfs.h"
 static int vcore_releasing;
 static struct workqueue_struct *vcore_wq;
@@ -339,7 +339,7 @@ static void mt_usb_enable(struct musb *musb)
 	if (!mtk_usb_power) {
 
 #ifndef FPGA_PLATFORM
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		/* enable_pll(UNIVPLL, "USB_PLL"); */
 		DBG(0, "enable UPLL before connect\n");
 		vcore_hold();
@@ -389,7 +389,7 @@ static void mt_usb_disable(struct musb *musb)
 		DBG(0, "<%d,%d,%d,%d>\n", virt_enable, virt_disable, real_enable, real_disable);
 
 #ifndef FPGA_PLATFORM
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		if (in_interrupt()) {
 			DBG(0, "in interrupt !!!!!!!!!!!!!!!\n");
 			DBG(0, "in interrupt !!!!!!!!!!!!!!!\n");
@@ -1218,7 +1218,7 @@ static int mt_usb_init(struct musb *musb)
 	wakeup_source_init(&musb->usb_lock, "USB suspend lock");
 
 #ifndef FPGA_PLATFORM
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 	INIT_WORK(&vcore_work, vcore_workqueue);
 	vcore_wq = create_freezable_workqueue("usb20_vcore_work");
 #endif

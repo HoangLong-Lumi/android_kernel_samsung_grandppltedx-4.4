@@ -1029,7 +1029,7 @@ INT32 mtk_wcn_consys_hw_restore(struct device *device)
 		/*set MPU for EMI share Memory */
 		WMT_PLAT_INFO_FUNC("setting MPU for EMI share memory\n");
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 		emi_mpu_set_region_protection(gConEmiPhyBase + SZ_1M / 2,
 							gConEmiPhyBase + SZ_1M - 1,
 							13,
@@ -1124,7 +1124,7 @@ INT32 mtk_wcn_consys_hw_init(void)
 		/*set MPU for EMI share Memory */
 		WMT_PLAT_INFO_FUNC("setting MPU for EMI share memory\n");
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 		emi_mpu_set_region_protection(gConEmiPhyBase + SZ_1M / 2,
 							gConEmiPhyBase + SZ_1M - 1,
 							13,

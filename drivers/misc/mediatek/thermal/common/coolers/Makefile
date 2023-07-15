@@ -19,7 +19,7 @@ ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/include/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/video/include
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6735"))
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D1
 endif
 

@@ -319,7 +319,7 @@ long GPS_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		GPS_DBG_FUNC("GPS co_clock_flag (%d)\n", retval);
 		break;
 	case COMBO_IOC_D1_EFUSE_GET:
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 		do {
 			char *addr = ioremap(0x10206198, 0x4);
 

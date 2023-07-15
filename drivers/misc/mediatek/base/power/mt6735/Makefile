@@ -17,7 +17,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/thermal/fakeHeader/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/cpuidle_v1/
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys/$(MTK_PLATFORM)/
@@ -34,20 +34,20 @@ obj-y += mt_clkbuf_ctl.o
 obj-y += mt_dcm.o
 ifeq ($(strip $(CONFIG_MTK_CLKMGR)),y)
 obj-y += mt_clkmgr_common_legacy.o
-obj-$(CONFIG_ARCH_MT6735) += mt_clkmgr_legacy.o
+obj-$(CONFIG_MACH_MT6735) += mt_clkmgr_legacy.o
 obj-$(CONFIG_ARCH_MT6735M) += mt_clkmgr2.o
 obj-$(CONFIG_ARCH_MT6753) += mt_clkmgr3.o
 else
 obj-y += mt_clkmgr_common.o
-obj-$(CONFIG_ARCH_MT6735) += mt_clkmgr.o
+obj-$(CONFIG_MACH_MT6735) += mt_clkmgr.o
 ifeq ($(strip $(CONFIG_DEBUG_FS)),y)
-obj-$(CONFIG_ARCH_MT6735) += mt_clkdbg.o
+obj-$(CONFIG_MACH_MT6735) += mt_clkdbg.o
 endif
 endif
 obj-y += mt_spm_mtcmos.o
 obj-y += mt_pbm.o
-obj-$(CONFIG_ARCH_MT6735) += mt_vcore_dvfs_1.o
-obj-$(CONFIG_ARCH_MT6735) += mt_spm_vcore_dvfs_1.o
+obj-$(CONFIG_MACH_MT6735) += mt_vcore_dvfs_1.o
+obj-$(CONFIG_MACH_MT6735) += mt_spm_vcore_dvfs_1.o
 obj-$(CONFIG_ARCH_MT6735M) += mt_vcore_dvfs_2.o
 obj-$(CONFIG_ARCH_MT6735M) += mt_spm_vcore_dvfs_2.o
 obj-$(CONFIG_ARCH_MT6753) += mt_vcore_dvfs_3.o

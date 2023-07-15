@@ -78,7 +78,7 @@ enum {
 /* define concurrency scenario ID */
 enum {
 #define X_CON_SCE(con_sce, arba, arbb, arbc, arbd, arbe, arbf, arbg2) con_sce,
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #include "mach/con_sce_lpddr3_1600_D1.h"
 #elif defined(CONFIG_ARCH_MT6735M)
 #include "mach/con_sce_lpddr3_1600_D2.h"

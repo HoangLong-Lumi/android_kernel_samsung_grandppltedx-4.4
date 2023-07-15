@@ -24,7 +24,7 @@ project_drv += camera_project/$(ARCH_MTK_PROJECT)/$(1)
 endif
 endef
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 MTK_PLATFORM := mt6735
 endif
 

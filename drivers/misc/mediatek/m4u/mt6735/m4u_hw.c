@@ -856,7 +856,7 @@ static int larb_clock_on(int larb)
 	case 2:
 		enable_clock(MT_CG_IMAGE_LARB2_SMI, "m4u_larb2");
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	case 3:
 		enable_clock(MT_CG_VENC_VENC, "m4u_larb3");
 		enable_clock(MT_CG_VENC_LARB, "m4u_larb3");
@@ -888,7 +888,7 @@ static int larb_clock_on(int larb)
 		if (ret)
 			M4UMSG("error: prepare clk %s fail!.\n", smi_clk_name[LARB2_SMI_CLK]);
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	case 3:
 		ret = clk_prepare_enable(gM4uDev->smi_clk[VENC_VENC_CLK]);
 		if (ret)
@@ -921,7 +921,7 @@ static int larb_clock_off(int larb)
 	case 2:
 		disable_clock(MT_CG_IMAGE_LARB2_SMI, "m4u_larb2");
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	case 3:
 		disable_clock(MT_CG_VENC_VENC, "m4u_larb3");
 		disable_clock(MT_CG_VENC_LARB, "m4u_larb3");
@@ -943,7 +943,7 @@ static int larb_clock_off(int larb)
 	case 2:
 		clk_disable_unprepare(gM4uDev->smi_clk[LARB2_SMI_CLK]);
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	case 3:
 		clk_disable_unprepare(gM4uDev->smi_clk[VENC_VENC_CLK]);
 		clk_disable_unprepare(gM4uDev->smi_clk[VENC_LARB_CLK]);

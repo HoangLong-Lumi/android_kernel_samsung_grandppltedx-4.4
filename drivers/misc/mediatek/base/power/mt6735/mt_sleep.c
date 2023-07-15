@@ -101,7 +101,7 @@ static bool slp_check_mtcmos_pll = 1;
 
 static u32 slp_spm_flags = {
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 		0
 #elif defined(CONFIG_ARCH_MT6735M)
 		0

@@ -25,7 +25,7 @@ obj-y += smi_config_util.o
 obj-y += smi_configuration.o
 obj-y += smi_internal.o
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -I$(srctree)/drivers/clk/mediatek
 ccflags-y += -DSMI_D1
 obj-y += mmdvfs_mgr.o

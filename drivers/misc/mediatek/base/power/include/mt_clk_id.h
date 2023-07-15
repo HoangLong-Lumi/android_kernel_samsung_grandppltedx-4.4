@@ -18,7 +18,7 @@
 
 #include "spm_v2/mt_clk_id.h"
 
-#elif defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 
 #endif
 

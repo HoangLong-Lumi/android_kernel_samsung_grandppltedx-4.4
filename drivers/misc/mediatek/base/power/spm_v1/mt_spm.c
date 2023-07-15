@@ -487,7 +487,7 @@ int spm_module_init(void)
 
 #ifndef CONFIG_MTK_FPGA
 #if defined(CONFIG_PM)
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6580) \
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6580) \
 	|| defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 	if (spm_fs_init() != 0)
 		r = -EPERM;
@@ -525,7 +525,7 @@ int spm_module_init(void)
 #ifdef SPM_VCORE_EN
 	spm_go_to_vcore_dvfs(SPM_VCORE_DVFS_EN, 0);
 #else
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	/* only for common solution, no DVS */
 	spm_go_to_vcore_dvfs(0, 0);
 #endif

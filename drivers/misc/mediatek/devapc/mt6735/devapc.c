@@ -86,7 +86,7 @@ static unsigned int devapc_irq;
 static void __iomem *devapc_ao_base;
 static void __iomem *devapc_pd_base;
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 static struct DEVICE_INFO devapc_devices[] = {
 	/*0*/
@@ -606,7 +606,7 @@ int mt_devapc_set_permission(unsigned int module, E_MASK_DOM domain_num, APC_ATT
 		base = DEVAPC0_D2_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MD32 == domain_num)
 		base = DEVAPC0_D3_APC_0 + (module / 16) * 4;
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	else if (DEVAPC_DOMAIN_MM == domain_num)
 		base = DEVAPC0_D4_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MD3 == domain_num)

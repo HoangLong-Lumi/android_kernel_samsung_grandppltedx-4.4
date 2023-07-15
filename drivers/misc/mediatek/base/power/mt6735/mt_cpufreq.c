@@ -1064,7 +1064,7 @@ static unsigned int _mt_cpufreq_get_cpu_level(void)
 
 		cpufreq_info("@%s: segment_code = 0x%x\n", __func__, segment_code);
 
-#if defined(CONFIG_ARCH_MT6735) && defined(CONFIG_MTK_EFUSE_DOWNGRADE)
+#if defined(CONFIG_MACH_MT6735) && defined(CONFIG_MTK_EFUSE_DOWNGRADE)
 		return CPU_LEVEL_4;	/* SW config 37T to 35M+ */
 #endif
 
@@ -1115,7 +1115,7 @@ static unsigned int _mt_cpufreq_get_cpu_level(void)
 					cpu_speed);
 			lv = CPU_LEVEL_1;
 		}
-#else	/* CONFIG_ARCH_MT6735 */
+#else	/* CONFIG_MACH_MT6735 */
 		if (cpu_speed >= 1500)
 			lv = CPU_LEVEL_0;	/* 1.5G */
 		else if (cpu_speed >= 1300)
@@ -1158,7 +1158,7 @@ static unsigned int _mt_cpufreq_get_cpu_level(void)
 	case 5:
 	case 6:
 	case 7:
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		lv = CPU_LEVEL_2;	/* 1.1G */
 		break;
 #endif
@@ -2262,7 +2262,7 @@ static void _mt_cpufreq_set_cur_freq(struct mt_cpu_dvfs *p, unsigned int cur_khz
 		}
 
 		cur_volt = p->ops->get_cur_volt(p);
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		/* Raise to 1.25V directly to avoid armpll_divider timing violation issue (only for 6735) */
 		if (cur_volt < 125000)
 			p->ops->set_cur_volt(p, 125000);
@@ -3256,7 +3256,7 @@ static int _mt_cpufreq_sync_opp_tbl_idx(struct mt_cpu_dvfs *p)
 	return ret;
 }
 
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 
 unsigned int leakage_data[NR_MAX_OPP_TBL] = {638, 594, 535, 424, 344, 279, 227, 183};
 #endif
@@ -3285,7 +3285,7 @@ static void _mt_cpufreq_power_calculation(struct mt_cpu_dvfs *p, int oppidx, int
 	p_dynamic = CA53_REF_POWER;
 
 	/* TODO: Use temp=65 to calculate leakage? check this! */
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 	if (p->cpu_level == CPU_LEVEL_3)
 		p_leakage = leakage_data[oppidx];
 	else
@@ -3637,7 +3637,7 @@ static void _mt_cpufreq_calc_power_throttle_idx(struct mt_cpu_dvfs *p)
 		case CPU_LEVEL_1:
 			p->idx_pwr_thro_max_opp = 4;
 			break;
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		case CPU_LEVEL_2:
 			p->idx_pwr_thro_max_opp = 1;
 			break;
@@ -3668,7 +3668,7 @@ static void _mt_cpufreq_calc_power_throttle_idx(struct mt_cpu_dvfs *p)
 		case CPU_LEVEL_1:
 			p->idx_pwr_thro_max_opp = 3;
 			break;
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 		case CPU_LEVEL_2:
 			p->idx_pwr_thro_max_opp = 0;
 			break;

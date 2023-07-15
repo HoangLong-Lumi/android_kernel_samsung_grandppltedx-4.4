@@ -303,7 +303,7 @@ enum {
 	NR_REASONS
 };
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 /* Idle handler on/off */
 static int idle_switch[NR_TYPES] = {
 	1,  /* dpidle switch */
@@ -1388,14 +1388,14 @@ out:
 
 static void slidle_before_wfi(int cpu)
 {
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 	mt_dcm_topckg_enable();
 #endif
 }
 
 static void slidle_after_wfi(int cpu)
 {
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 	mt_dcm_topckg_disable();
 	slidle_cnt[cpu]++;
 #endif

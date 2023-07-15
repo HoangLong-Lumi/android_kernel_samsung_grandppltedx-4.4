@@ -878,7 +878,7 @@ int dram_fh_steps_freq(unsigned int step)
 {
 	int freq;
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	unsigned int d1plus = ((get_devinfo_with_index(47) & (1<<31)) && !(get_devinfo_with_index(47) & (1<<29)) &&
 				!(get_devinfo_with_index(47) & (1<<28))) ? 1 : 0;
 	unsigned int ddr_type = get_ddr_type();
@@ -975,7 +975,7 @@ int dram_do_dfs_by_fh(unsigned int freq)
 {
 	int detect_fh = dram_can_support_fh();
 	unsigned int target_dds;
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	unsigned int ddr_type = get_ddr_type();
 #endif
 
@@ -988,7 +988,7 @@ int dram_do_dfs_by_fh(unsigned int freq)
 		return -1;
 
 	switch (freq) {
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	case 938000:
 		if (ddr_type == TYPE_LPDDR2)
 			target_dds = 0x10cefe;	/* ///< 938Mbps for LPDDR2 */

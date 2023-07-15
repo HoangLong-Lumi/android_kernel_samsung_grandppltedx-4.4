@@ -52,7 +52,7 @@
 #define SPM_PWAKE_EN            0
 #define SPM_BYPASS_SYSPWREQ     1
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
 	WAKE_SRC_CCIF0_MD | WAKE_SRC_CCIF1_MD | WAKE_SRC_CONN2AP | WAKE_SRC_USB_CD | \
@@ -136,7 +136,7 @@ enum spm_deepidle_step {
 };
 #endif
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 /*
  * PCM code for deep idle
  */

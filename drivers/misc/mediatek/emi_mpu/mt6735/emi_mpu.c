@@ -945,7 +945,7 @@ static irqreturn_t mpu_violation_irq(int irq, void *dev_id)
 		dbg_pqry = readl(IOMEM(EMI_MPUY));
 		break;
 
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	case 4:
 		dbg_pqry = readl(IOMEM(EMI_MPUP2));
 		break;
@@ -1157,7 +1157,7 @@ static ssize_t emi_mpu_show(struct device_driver *driver, char *buf)
 	unsigned int start, end;
 	unsigned int reg_value;
 	unsigned int d0, d1, d2, d3;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	unsigned int d4, d5, d6, d7, reg_value2;
 #endif
 
@@ -1211,7 +1211,7 @@ static ssize_t emi_mpu_show(struct device_driver *driver, char *buf)
 	end = ((reg_value & 0xFFFF) << 16) + emi_physical_offset + 0xFFFF;
 	ptr += sprintf(ptr, "Region 7 --> 0x%x to 0x%x\n", start, end);
 
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	reg_value = readl(IOMEM(EMI_MPUA2));
 	start = ((reg_value >> 16) << 16) + emi_physical_offset;
 	end = ((reg_value & 0xFFFF) << 16) + emi_physical_offset + 0xFFFF;
@@ -1255,7 +1255,7 @@ static ssize_t emi_mpu_show(struct device_driver *driver, char *buf)
 
 	ptr += sprintf(ptr, "\n");
 
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	reg_value = readl(IOMEM(EMI_MPUI));
 	reg_value2 = readl(IOMEM(EMI_MPUI_2ND));
 	d0 = (reg_value & 0x7);
@@ -1754,7 +1754,7 @@ const char *buf, size_t count)
 			goto out;
 
 		access_permission = SET_ACCESS_PERMISSON(NO_PROTECTION,
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 							 NO_PROTECTION,
 							 NO_PROTECTION,
 							 NO_PROTECTION,
@@ -2254,7 +2254,7 @@ out:
 DRIVER_ATTR(emi_wp_vio, 0644, emi_wp_vio_show, emi_wp_vio_store);
 #endif /*#ifdef ENABLE_EMI_WATCH_POINT*/
 
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 #define AP_REGION_ID   15
 #else /* MT6735M*/
 #define AP_REGION_ID   7
@@ -2272,7 +2272,7 @@ static void protect_ap_region(void)
 	dram_size = get_max_DRAM_size();
 
 	ap_mem_mpu_id = AP_REGION_ID;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6753)
 	ap_mem_mpu_attr = SET_ACCESS_PERMISSON(FORBIDDEN,
 					       NO_PROTECTION,
 					       FORBIDDEN,

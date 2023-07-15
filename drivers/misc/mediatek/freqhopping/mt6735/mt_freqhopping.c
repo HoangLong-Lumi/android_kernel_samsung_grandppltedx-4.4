@@ -575,7 +575,7 @@ static int mt_fh_hal_dvfs(enum FH_PLL_ID pll_id, unsigned int dds_value)
 	/* TODO: Does this need to be changed? */
 	fh_write32(REG_FHCTL_SLOPE0, 0x6003c97);
 	if (pll_id == FH_MEM_PLLID) {
-#if defined(CONFIG_ARCH_MT6735)	/* D1 slope */
+#if defined(CONFIG_MACH_MT6735)	/* D1 slope */
 		fh_write32(REG_FHCTL_SLOPE1, 0xFF00095A);
 #elif defined(CONFIG_ARCH_MT6735M)	/* D2 slope */
 		fh_write32(REG_FHCTL_SLOPE1, 0xFF000693);

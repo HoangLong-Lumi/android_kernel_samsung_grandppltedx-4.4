@@ -99,7 +99,7 @@ struct wake_status spm_wakesta;	/* record last wakesta */
 /**********************************************************
  * PCM code for suspend
  **********************************************************/
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 static const u32 suspend_binary_rev00[] = {
 	0x81429801, 0xd80001e5, 0x17c07c1f, 0x18c0001f, 0x10001138, 0x1910001f,
 	0x10001138, 0xa1108404, 0xe0c00004, 0x1910001f, 0x10001138, 0x1a00001f,
@@ -1743,7 +1743,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	int wd_ret;
 	/* struct wake_status wakesta; */
 	unsigned long flags;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M)
 	unsigned long temp_a, temp_b;
 #endif
 #if 0
@@ -1861,7 +1861,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	temp_b = spm_read(PMIC_WRAP_DVFS_WDATA2);
 	spm_write(SPM_PCM_PASR_DPD_2, (temp_a << 16) | temp_b);
 #endif
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	temp_a = spm_read(PMIC_WRAP_DVFS_WDATA2);
 	temp_b = spm_read(PMIC_WRAP_DVFS_WDATA3);
 	spm_write(SPM_PCM_PASR_DPD_3, (temp_b << 16) | temp_a);

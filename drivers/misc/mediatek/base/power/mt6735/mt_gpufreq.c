@@ -383,7 +383,7 @@ static unsigned int _mt_gpufreq_get_dvfs_table_type(void)
 
 		gpufreq_info("@%s: segment_code = 0x%x\n", __func__, segment_code);
 
-#if defined(CONFIG_ARCH_MT6735) && defined(CONFIG_MTK_EFUSE_DOWNGRADE)
+#if defined(CONFIG_MACH_MT6735) && defined(CONFIG_MTK_EFUSE_DOWNGRADE)
 		return 3;	/* SW config 37T to 35M+ */
 #endif
 
@@ -875,7 +875,7 @@ static int _mt_gpufreq_set_cur_volt(unsigned int new_oppidx)
 		g_last_gpu_dvs_result = vcorefs_request_dvfs_opp(KIR_GPU, OPPI_PERF_ULTRA);
 #else
 	case GPU_DVFS_FREQ0:
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 	case GPU_DVFS_FREQ0_1:
 #endif
 		g_last_gpu_dvs_result = vcorefs_request_dvfs_opp(KIR_GPU, OPPI_PERF);
@@ -1915,7 +1915,7 @@ static int _mt_gpufreq_pdrv_probe(struct platform_device *pdev)
 	else if (mt_gpufreq_dvfs_table_type == 2)    /* for 35+/37+ */
 		_mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_2, ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_2));
 #endif
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 	else if (mt_gpufreq_dvfs_table_type == 3)    /* for 37+ simulate 35+ */
 		_mt_setup_gpufreqs_table(mt_gpufreq_opp_tbl_e1_3, ARRAY_SIZE(mt_gpufreq_opp_tbl_e1_3));
 #endif

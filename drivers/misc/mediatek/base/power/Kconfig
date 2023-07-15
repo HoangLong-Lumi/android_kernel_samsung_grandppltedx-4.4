@@ -10,7 +10,7 @@ config MTK_CLKMGR
 
 config SODI_ON
 	bool "Enable SODI"
-	depends on (ARCH_MT6735 || ARCH_MT6735M || ARCH_MT6753)
+	depends on (MACH_MT6735 || ARCH_MT6735M || ARCH_MT6753)
 	default n
 	help
 	  Select if you want to enable Screen ON DeepIdle (SODI).

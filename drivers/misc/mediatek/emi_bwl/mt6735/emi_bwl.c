@@ -53,7 +53,7 @@ static struct emi_bwl_ctrl ctrl_tbl[NR_CON_SCE];
 /* current concurrency scenario */
 static int cur_con_sce = 0x0FFFFFFF;
 
-#if defined(CONFIG_ARCH_MT6735) && !defined(CONFIG_MTK_EMI_D1P)
+#if defined(CONFIG_MACH_MT6735) && !defined(CONFIG_MTK_EMI_D1P)
 
 /* define concurrency scenario strings */
 static const char const *con_sce_str[] = {

@@ -18,7 +18,7 @@
 #include <linux/module.h>
 #endif
 
-#ifdef CONFIG_ARCH_MT6735
+#ifdef CONFIG_MACH_MT6735
 #include "mt_spower_data.h"
 #else
 #ifdef CONFIG_ARCH_MT6753

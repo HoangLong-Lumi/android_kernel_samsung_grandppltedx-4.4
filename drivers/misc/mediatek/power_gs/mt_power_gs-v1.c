@@ -72,7 +72,7 @@ void mt_power_gs_dump_suspend(void)
 	mt_power_gs_compare("Suspend ", "6325",
 			    MT6325_PMIC_REG_gs_flightmode_suspend_mode,
 			    MT6325_PMIC_REG_gs_flightmode_suspend_mode_len);
-#elif defined CONFIG_ARCH_MT6735 || defined CONFIG_ARCH_MT6735M || defined CONFIG_ARCH_MT6753
+#elif defined CONFIG_MACH_MT6735 || defined CONFIG_ARCH_MT6735M || defined CONFIG_ARCH_MT6753
 	mt_power_gs_compare("Suspend ", "6328",
 			    MT6328_PMIC_REG_gs_flightmode_suspend_mode,
 			    MT6328_PMIC_REG_gs_flightmode_suspend_mode_len);

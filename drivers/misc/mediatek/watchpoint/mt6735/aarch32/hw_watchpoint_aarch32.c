@@ -417,7 +417,7 @@ int watchpoint_handler(unsigned long addr, unsigned int fsr, struct pt_regs *reg
 	unsigned long wfar, daddr, iaddr;
 	int i, ret, j;
 #if defined(CONFIG_ARCH_MT6595) || defined(CONFIG_ARCH_MT6752)\
-	|| defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+	|| defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
 	    /* Notes
 	     *v7 Debug the address of instruction that triggered the watchpoint is in DBGWFAR
 	     *v7.1 Debug the address is in DFAR

@@ -14,7 +14,7 @@
 #ifndef __M4U_PORT_H__
 #define __M4U_PORT_H__
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #include "mt6735/m4u_port.h"
 #endif
 
