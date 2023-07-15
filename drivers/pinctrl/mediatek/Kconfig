@@ -6,6 +6,12 @@ config PINCTRL_MTK_COMMON
 	select GPIOLIB
 	select OF_GPIO
 
+config PINCTRL_MT6735
+	bool "pinctrl mt6735"
+	default n
+	def_bool MACH_MT6735
+	select PINCTRL_MTK_COMMON
+
 if ARCH_MEDIATEK || COMPILE_TEST
 
 # For ARMv7 SoCs
