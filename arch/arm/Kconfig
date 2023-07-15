@@ -94,6 +94,45 @@ config ARM
 	  Europe.  There is an ARM Linux project with a web page at
 	  <http://www.arm.linux.org.uk/>.
 
+config MACH_MT6735
+	bool "MediaTek MT6735"
+	select GENERIC_TIME
+	select GENERIC_CLOCKEVENTS
+	select ARCH_HAS_CPUFREQ
+	select ARM_HAS_SG_CHAIN
+	select ARM_AMBA
+	select CPU_V7
+	select HAVE_SMP
+	select NEED_MACH_MEMORY_H
+	select IRQ_DOMAIN
+	select IRQ_DOMAIN_DEBUG
+	select GENERIC_SCHED_CLOCK
+	select VFP_OPT
+	select ARCH_REQUIRE_GPIOLIB
+	select MTK_SYSTRACKER
+	select MTK_SYS_CIRQ
+	select MTK_EIC
+	select MTK_GIC
+	select COMMON_CLK if !MTK_CLKMGR
+	select CPU_IDLE
+	select PINCTRL
+	select PINCTRL_MT6735
+	select MFD_SYSCON
+	select MTK_BASE_POWER
+	select KERNEL_MODE_NEON
+	select ARM_CRYPTO
+	select CRYPTO_AES_ARM_CE
+	select CRYPTO_SHA2_ARM_CE
+	select ARM_ERRATA_855873
+	select MTK_IRQ_NEW_DESIGN
+	select MTK_IRQ_NEW_DESIGN_DEBUG
+	select MTK_POWER_GS
+	select MTK_CPU_STRESS
+	select SDCARD_FS
+	select OVERLAY_FS
+	help
+	  This enable support for MediaTek MT6735
+
 config ARM_HAS_SG_CHAIN
 	select ARCH_HAS_SG_CHAIN
 	bool
