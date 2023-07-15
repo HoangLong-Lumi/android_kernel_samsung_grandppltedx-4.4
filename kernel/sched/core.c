@@ -87,8 +87,22 @@
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
 
+#ifdef CONFIG_MTK_SCHED_MONITOR
+#include "mtk_sched_mon.h"
+#endif
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
+#include <linux/sec_debug.h>
+
+enum ipi_msg_type {
+	IPI_RESCHEDULE,
+	IPI_CALL_FUNC,
+	IPI_CALL_FUNC_SINGLE,
+	IPI_CPU_STOP,
+	IPI_TIMER,
+	IPI_IRQ_WORK,
+};
 
 DEFINE_MUTEX(sched_domains_mutex);
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
@@ -1229,13 +1243,20 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 		goto out;
 	}
 
-	do_set_cpus_allowed(p, new_mask);
-
 	/* Can the task run on the task's current CPU? If so, we're done */
-	if (cpumask_test_cpu(task_cpu(p), new_mask))
+	if (cpumask_test_cpu(task_cpu(p), new_mask)) {
+		do_set_cpus_allowed(p, new_mask);
 		goto out;
+	}
 
 	dest_cpu = cpumask_any_and(cpu_active_mask, new_mask);
+	/* sched: if cpu_active_mask and new_mask have no intesects */
+	if (dest_cpu >= nr_cpu_ids) {
+		ret = -EINVAL;
+		goto out;
+	} else
+		do_set_cpus_allowed(p, new_mask);
+
 	if (task_running(rq, p) || p->state == TASK_WAKING) {
 		struct migration_arg arg = { p, dest_cpu };
 		/* Need help from migration thread: drop lock and wait. */
@@ -1248,9 +1269,11 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 		 * OK, since we're going to drop the lock immediately
 		 * afterwards anyway.
 		 */
-		lockdep_unpin_lock(&rq->lock);
-		rq = move_queued_task(rq, p, dest_cpu);
-		lockdep_pin_lock(&rq->lock);
+		if (cpu_online(dest_cpu)) {
+			lockdep_unpin_lock(&rq->lock);
+			rq = move_queued_task(rq, p, dest_cpu);
+			lockdep_pin_lock(&rq->lock);
+		}
 	}
 out:
 	task_rq_unlock(rq, p, &flags);
@@ -1335,9 +1358,6 @@ static int migrate_swap_stop(void *data)
 	struct rq *src_rq, *dst_rq;
 	int ret = -EAGAIN;
 
-	if (!cpu_active(arg->src_cpu) || !cpu_active(arg->dst_cpu))
-		return -EAGAIN;
-
 	src_rq = cpu_rq(arg->src_cpu);
 	dst_rq = cpu_rq(arg->dst_cpu);
 
@@ -1378,6 +1398,8 @@ int migrate_swap(struct task_struct *cur, struct task_struct *p)
 	struct migration_swap_arg arg;
 	int ret = -EINVAL;
 
+	get_online_cpus();
+
 	arg = (struct migration_swap_arg){
 		.src_task = cur,
 		.src_cpu = task_cpu(cur),
@@ -1388,10 +1410,6 @@ int migrate_swap(struct task_struct *cur, struct task_struct *p)
 	if (arg.src_cpu == arg.dst_cpu)
 		goto out;
 
-	/*
-	 * These three tests are all lockless; this is OK since all of them
-	 * will be re-checked with proper locks held further down the line.
-	 */
 	if (!cpu_active(arg.src_cpu) || !cpu_active(arg.dst_cpu))
 		goto out;
 
@@ -1405,6 +1423,7 @@ int migrate_swap(struct task_struct *cur, struct task_struct *p)
 	ret = stop_two_cpus(arg.dst_cpu, arg.src_cpu, migrate_swap_stop, &arg);
 
 out:
+	put_online_cpus();
 	return ret;
 }
 
@@ -1815,8 +1834,14 @@ void scheduler_ipi(void)
 	 */
 	preempt_fold_need_resched();
 
-	if (llist_empty(&this_rq()->wake_list) && !got_nohz_idle_kick())
+	if (llist_empty(&this_rq()->wake_list) && !got_nohz_idle_kick()) {
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_ISR_start(IPI_RESCHEDULE);
+		mt_trace_ISR_end(IPI_RESCHEDULE);
+#endif
 		return;
+	}
+
 
 	/*
 	 * Not all reschedule IPI handlers call irq_enter/irq_exit, since
@@ -1832,6 +1857,9 @@ void scheduler_ipi(void)
 	 * somewhat pessimize the simple resched case.
 	 */
 	irq_enter();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+	mt_trace_ISR_start(IPI_RESCHEDULE);
+#endif
 	sched_ttwu_pending();
 
 	/*
@@ -1841,6 +1869,9 @@ void scheduler_ipi(void)
 		this_rq()->idle_balance = 1;
 		raise_softirq_irqoff(SCHED_SOFTIRQ);
 	}
+#ifdef CONFIG_MTK_SCHED_MONITOR
+	mt_trace_ISR_end(IPI_RESCHEDULE);
+#endif
 	irq_exit();
 }
 
@@ -1941,6 +1972,29 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 
 	success = 1; /* we're going to change ->state */
 	cpu = task_cpu(p);
+
+	/*
+	 * Ensure we load p->on_rq _after_ p->state, otherwise it would
+	 * be possible to, falsely, observe p->on_rq == 0 and get stuck
+	 * in smp_cond_load_acquire() below.
+	 *
+	 * sched_ttwu_pending()                 try_to_wake_up()
+	 *   [S] p->on_rq = 1;                  [L] P->state
+	 *       UNLOCK rq->lock  -----.
+	 *                              \
+	 *                               +---   RMB
+	 * schedule()                   /
+	 *       LOCK rq->lock    -----'
+	 *       UNLOCK rq->lock
+	 *
+	 * [task p]
+	 *   [S] p->state = UNINTERRUPTIBLE     [L] p->on_rq
+	 *
+	 * Pairs with the UNLOCK+LOCK on rq->lock from the
+	 * last wakeup of our task and the schedule that got our task
+	 * current.
+	 */
+	smp_rmb();
 
 	if (p->on_rq && ttwu_remote(p, wake_flags))
 		goto stat;
@@ -2596,6 +2650,14 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	return rq;
 }
 
+unsigned long get_cpu_load(int cpu)
+{
+	struct rq *this = cpu_rq(cpu);
+
+	return this->cpu_load[0];
+}
+EXPORT_SYMBOL(get_cpu_load);
+
 #ifdef CONFIG_SMP
 
 /* rq->lock is NOT held, but preemption is disabled */
@@ -2865,8 +2927,13 @@ void scheduler_tick(void)
 	struct task_struct *curr = rq->curr;
 
 	sched_clock_tick();
-
+#ifdef CONFIG_MTK_SCHED_MONITOR
+	mt_trace_rqlock_start(&rq->lock);
+#endif
 	raw_spin_lock(&rq->lock);
+#ifdef CONFIG_MTK_SCHED_MONITOR
+	mt_trace_rqlock_end(&rq->lock);
+#endif
 	update_rq_clock(rq);
 	curr->sched_class->task_tick(rq, curr, 0);
 	update_cpu_load_active(rq);
@@ -2874,6 +2941,9 @@ void scheduler_tick(void)
 	raw_spin_unlock(&rq->lock);
 
 	perf_event_task_tick();
+#ifdef CONFIG_MTK_SCHED_MONITOR
+	mt_save_irq_counts(SCHED_TICK);
+#endif
 
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
@@ -2923,6 +2993,45 @@ notrace unsigned long get_parent_ip(unsigned long addr)
 #if defined(CONFIG_PREEMPT) && (defined(CONFIG_DEBUG_PREEMPT) || \
 				defined(CONFIG_PREEMPT_TRACER))
 
+#ifdef CONFIG_MT_DEBUG_PREEMPT
+#define ADD_PREEMPT     0
+#define SUB_PREEMPT     1
+void preempt_dump_backtrace(int type)
+{
+	int cpu = smp_processor_id();
+	struct rq *rq = cpu_rq(cpu);
+	struct task_struct *curr = rq->curr;
+
+	if (curr != NULL) {
+		if ((preempt_count() == 2) && (strncmp(curr->comm, "swapper", 7) == 0)) {
+			unsigned long entries[12] = { 0 };
+			struct stack_trace trace;
+
+			trace.nr_entries = 0;
+			trace.max_entries = ARRAY_SIZE(entries);
+			trace.entries = entries;
+			trace.skip = 2;
+
+			save_stack_trace(&trace);
+
+			if (type == ADD_PREEMPT) {
+				mt_sched_printf(sched_preempt, "addpreempt0 %lx %lx %lx %lx %lx %lx",
+					entries[0], entries[1], entries[2], entries[3], entries[4], entries[5]);
+				mt_sched_printf(sched_preempt, "addpreempt1 %lx %lx %lx %lx %lx %lx",
+					entries[6], entries[7], entries[8], entries[9], entries[10], entries[11]);
+			} else if (type == SUB_PREEMPT) {
+				mt_sched_printf(sched_preempt, "subpreempt0 %lx %lx %lx %lx %lx %lx",
+					entries[0], entries[1], entries[2], entries[3], entries[4], entries[5]);
+				mt_sched_printf(sched_preempt, "subpreempt1 %lx %lx %lx %lx %lx %lx",
+					entries[6], entries[7], entries[8], entries[9], entries[10], entries[11]);
+			}
+
+		}
+	}
+}
+
+#endif
+
 void preempt_count_add(int val)
 {
 #ifdef CONFIG_DEBUG_PREEMPT
@@ -2933,6 +3042,10 @@ void preempt_count_add(int val)
 		return;
 #endif
 	__preempt_count_add(val);
+#ifdef CONFIG_MT_DEBUG_PREEMPT
+	preempt_dump_backtrace(ADD_PREEMPT);
+#endif
+
 #ifdef CONFIG_DEBUG_PREEMPT
 	/*
 	 * Spinlock count overflowing soon?
@@ -2946,6 +3059,9 @@ void preempt_count_add(int val)
 		current->preempt_disable_ip = ip;
 #endif
 		trace_preempt_off(CALLER_ADDR0, ip);
+#ifdef CONFIG_PREEMPT_MONITOR
+		MT_trace_preempt_off();
+#endif
 	}
 }
 EXPORT_SYMBOL(preempt_count_add);
@@ -2967,9 +3083,20 @@ void preempt_count_sub(int val)
 		return;
 #endif
 
-	if (preempt_count() == val)
+#ifdef CONFIG_MT_DEBUG_PREEMPT
+	preempt_dump_backtrace(SUB_PREEMPT);
+#endif
+
+	if (preempt_count() == val) {
 		trace_preempt_on(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
+#ifdef CONFIG_PREEMPT_MONITOR
+		MT_trace_preempt_on();
+#endif
+	}
 	__preempt_count_sub(val);
+#ifdef CONFIG_PREEMPT_MONITOR
+	MT_trace_check_preempt_dur();
+#endif
 }
 EXPORT_SYMBOL(preempt_count_sub);
 NOKPROBE_SYMBOL(preempt_count_sub);
@@ -3000,6 +3127,10 @@ static noinline void __schedule_bug(struct task_struct *prev)
 #endif
 	dump_stack();
 	add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
+	sec_debug_set_extra_info_hotplugfail_cnt();
+#endif
+	BUG_ON(1);
 }
 
 /*
@@ -3128,6 +3259,9 @@ static void __sched notrace __schedule(bool preempt)
 
 	if (sched_feat(HRTICK))
 		hrtick_clear(rq);
+#ifdef CONFIG_PREEMPT_MONITOR
+	per_cpu(MT_trace_in_sched, cpu) = 1;
+#endif
 
 	/*
 	 * Make sure that signal_pending_state()->signal_pending() below
@@ -3184,7 +3318,9 @@ static void __sched notrace __schedule(bool preempt)
 		lockdep_unpin_lock(&rq->lock);
 		raw_spin_unlock_irq(&rq->lock);
 	}
-
+#ifdef CONFIG_PREEMPT_MONITOR
+	per_cpu(MT_trace_in_sched, cpu) = 0;
+#endif
 	balance_callback(rq);
 }
 
@@ -4403,11 +4539,13 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	struct task_struct *p;
 	int retval;
 
+	get_online_cpus();
 	rcu_read_lock();
 
 	p = find_process_by_pid(pid);
 	if (!p) {
 		rcu_read_unlock();
+		pr_debug("SCHED: setaffinity find process %d fail\n", pid);
 		return -ESRCH;
 	}
 
@@ -4417,14 +4555,17 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 
 	if (p->flags & PF_NO_SETAFFINITY) {
 		retval = -EINVAL;
+		pr_debug("SCHED: setaffinity flags PF_NO_SETAFFINITY fail\n");
 		goto out_put_task;
 	}
 	if (!alloc_cpumask_var(&cpus_allowed, GFP_KERNEL)) {
 		retval = -ENOMEM;
+		pr_debug("SCHED: setaffinity allo_cpumask_var for cpus_allowed fail\n");
 		goto out_put_task;
 	}
 	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL)) {
 		retval = -ENOMEM;
+		pr_debug("SCHED: setaffinity allo_cpumask_var for new_mask fail\n");
 		goto out_free_cpus_allowed;
 	}
 	retval = -EPERM;
@@ -4432,15 +4573,17 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 		rcu_read_lock();
 		if (!ns_capable(__task_cred(p)->user_ns, CAP_SYS_NICE)) {
 			rcu_read_unlock();
+			pr_debug("SCHED: setaffinity check_same_owner and task_ns_capable fail\n");
 			goto out_free_new_mask;
 		}
 		rcu_read_unlock();
 	}
 
 	retval = security_task_setscheduler(p);
-	if (retval)
+	if (retval) {
+		pr_debug("SCHED: setaffinity security_task_setscheduler fail, status: %d\n", retval);
 		goto out_free_new_mask;
-
+	}
 
 	cpuset_cpus_allowed(p, cpus_allowed);
 	cpumask_and(new_mask, in_mask, cpus_allowed);
@@ -4464,6 +4607,8 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 #endif
 again:
 	retval = __set_cpus_allowed_ptr(p, new_mask, true);
+	if (retval)
+		pr_debug("SCHED: set_cpus_allowed_ptr status %d\n", retval);
 
 	if (!retval) {
 		cpuset_cpus_allowed(p, cpus_allowed);
@@ -4483,6 +4628,7 @@ out_free_cpus_allowed:
 	free_cpumask_var(cpus_allowed);
 out_put_task:
 	put_task_struct(p);
+	put_online_cpus();
 	return retval;
 }
 
@@ -4527,23 +4673,32 @@ long sched_getaffinity(pid_t pid, struct cpumask *mask)
 	unsigned long flags;
 	int retval;
 
+	get_online_cpus();
 	rcu_read_lock();
 
 	retval = -ESRCH;
 	p = find_process_by_pid(pid);
-	if (!p)
+	if (!p) {
+		pr_debug("SCHED: getaffinity find process %d fail\n", pid);
 		goto out_unlock;
+	}
 
 	retval = security_task_getscheduler(p);
-	if (retval)
+	if (retval) {
+		pr_debug("SCHED: getaffinity security_task_getscheduler fail, status: %d\n", retval);
 		goto out_unlock;
+	}
 
 	raw_spin_lock_irqsave(&p->pi_lock, flags);
-	cpumask_and(mask, &p->cpus_allowed, cpu_active_mask);
+	cpumask_and(mask, &p->cpus_allowed, cpu_online_mask);
 	raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 
 out_unlock:
 	rcu_read_unlock();
+	put_online_cpus();
+
+	if (retval)
+		pr_debug("SCHED: getaffinity status %d\n", retval);
 
 	return retval;
 }
@@ -5247,6 +5402,7 @@ static void migrate_tasks(struct rq *dead_rq)
 	 * value of rq->clock[_task]
 	 */
 	update_rq_clock(rq);
+	unthrottle_offline_rt_rqs(rq);
 
 	for (;;) {
 		/*
@@ -7309,17 +7465,14 @@ void __init sched_init_smp(void)
 
 	sched_init_numa();
 
-	/*
-	 * There's no userspace yet to cause hotplug operations; hence all the
-	 * cpu masks are stable and all blatant races in the below code cannot
-	 * happen.
-	 */
+	get_online_cpus();
 	mutex_lock(&sched_domains_mutex);
 	init_sched_domains(cpu_active_mask);
 	cpumask_andnot(non_isolated_cpus, cpu_possible_mask, cpu_isolated_map);
 	if (cpumask_empty(non_isolated_cpus))
 		cpumask_set_cpu(smp_processor_id(), non_isolated_cpus);
 	mutex_unlock(&sched_domains_mutex);
+	put_online_cpus();
 
 	hotcpu_notifier(sched_domains_numa_masks_update, CPU_PRI_SCHED_ACTIVE);
 	hotcpu_notifier(cpuset_cpu_active, CPU_PRI_CPUSET_ACTIVE);
@@ -7399,6 +7552,9 @@ void __init sched_init(void)
 	}
 #endif /* CONFIG_CPUMASK_OFFSTACK */
 
+    sec_gaf_supply_rqinfo(offsetof(struct rq, curr),
+                          offsetof(struct cfs_rq, rq));
+
 	init_rt_bandwidth(&def_rt_bandwidth,
 			global_rt_period(), global_rt_runtime());
 	init_dl_bandwidth(&def_dl_bandwidth,
@@ -7429,6 +7585,10 @@ void __init sched_init(void)
 		rq->nr_running = 0;
 		rq->calc_load_active = 0;
 		rq->calc_load_update = jiffies + LOAD_FREQ;
+#ifdef CONFIG_PROVE_LOCKING
+		/* sched: for lock proving*/
+		rq->cpu = i;
+#endif
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt);
 		init_dl_rq(&rq->dl);
@@ -7544,6 +7704,14 @@ static inline int preempt_count_equals(int preempt_offset)
 	return (nested == preempt_offset);
 }
 
+static int __might_sleep_init_called;
+int __init __might_sleep_init(void)
+{
+	__might_sleep_init_called = 1;
+	return 0;
+}
+early_initcall(__might_sleep_init);
+
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
 	/*
@@ -7568,8 +7736,10 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 
 	rcu_sleep_check(); /* WARN_ON_ONCE() by default, no rate limit reqd. */
 	if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
-	     !is_idle_task(current)) ||
-	    system_state != SYSTEM_RUNNING || oops_in_progress)
+	     !is_idle_task(current)) || oops_in_progress)
+		return;
+	if (system_state != SYSTEM_RUNNING &&
+	    (!__might_sleep_init_called || system_state != SYSTEM_BOOTING))
 		return;
 	if (time_before(jiffies, prev_jiffy + HZ) && prev_jiffy)
 		return;
@@ -8594,6 +8764,7 @@ struct cgroup_subsys cpu_cgrp_subsys = {
 	.fork		= cpu_cgroup_fork,
 	.can_attach	= cpu_cgroup_can_attach,
 	.attach		= cpu_cgroup_attach,
+	.allow_attach   = subsys_cgroup_allow_attach,
 	.legacy_cftypes	= cpu_files,
 	.early_init	= 1,
 };

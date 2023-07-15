@@ -27,6 +27,7 @@
 #include <linux/threads.h>
 #include <linux/cpumask.h>
 #include <linux/seqlock.h>
+#include <linux/swait.h>
 #include <linux/stop_machine.h>
 
 /*
@@ -241,7 +242,7 @@ struct rcu_node {
 				/* Refused to boost: not sure why, though. */
 				/*  This can happen due to race conditions. */
 #ifdef CONFIG_RCU_NOCB_CPU
-	wait_queue_head_t nocb_gp_wq[2];
+	struct swait_queue_head nocb_gp_wq[2];
 				/* Place for rcu_nocb_kthread() to wait GP. */
 #endif /* #ifdef CONFIG_RCU_NOCB_CPU */
 	int need_future_gp[2];
@@ -393,7 +394,7 @@ struct rcu_data {
 	atomic_long_t nocb_q_count_lazy; /*  invocation (all stages). */
 	struct rcu_head *nocb_follower_head; /* CBs ready to invoke. */
 	struct rcu_head **nocb_follower_tail;
-	wait_queue_head_t nocb_wq;	/* For nocb kthreads to sleep on. */
+	struct swait_queue_head nocb_wq; /* For nocb kthreads to sleep on. */
 	struct task_struct *nocb_kthread;
 	int nocb_defer_wakeup;		/* Defer wakeup of nocb_kthread. */
 
@@ -472,7 +473,7 @@ struct rcu_state {
 	unsigned long gpnum;			/* Current gp number. */
 	unsigned long completed;		/* # of last completed gp. */
 	struct task_struct *gp_kthread;		/* Task for grace periods. */
-	wait_queue_head_t gp_wq;		/* Where GP task waits. */
+	struct swait_queue_head gp_wq;		/* Where GP task waits. */
 	short gp_flags;				/* Commands for GP task. */
 	short gp_state;				/* GP kthread sleep state. */
 
@@ -504,7 +505,7 @@ struct rcu_state {
 	atomic_long_t expedited_workdone3;	/* # done by others #3. */
 	atomic_long_t expedited_normal;		/* # fallbacks to normal. */
 	atomic_t expedited_need_qs;		/* # CPUs left to check in. */
-	wait_queue_head_t expedited_wq;		/* Wait for check-ins. */
+	struct swait_queue_head expedited_wq;	/* Wait for check-ins. */
 	int ncpus_snap;				/* # CPUs seen last time. */
 
 	unsigned long jiffies_force_qs;		/* Time at which to invoke */
@@ -638,6 +639,61 @@ static void rcu_dynticks_task_enter(void);
 static void rcu_dynticks_task_exit(void);
 
 #endif /* #ifndef RCU_TREE_NONCORE */
+
+#ifdef CONFIG_MTK_RCU_MONITOR
+#include <linux/sched.h>
+
+#define MAX_RCU_BUFF_LEN			1024
+#define MAX_SERVICE_NAME_LEN		16
+
+#define CALL_RCU			0
+#define INVOKE_RCU			1
+
+struct rcu_callback_log_entry {
+	int cpu;
+	char rcuname[MAX_SERVICE_NAME_LEN];
+	char comm[TASK_COMM_LEN];
+	unsigned long rhp;
+	unsigned long func;
+	long qlen;
+	unsigned long gpnum;
+	unsigned long ip;
+	ktime_t time;
+};
+
+struct rcu_callback_log {
+	int next;
+	int full;
+	unsigned size;
+	struct rcu_callback_log_entry *entry;
+};
+
+struct rcu_invoke_log_entry {
+	int cpu;
+	char rcuname[MAX_SERVICE_NAME_LEN];
+	unsigned long rhp;
+	unsigned long func;
+	long qlen;
+	unsigned long gpnum;
+	ktime_t time_start;
+	s64 time_dur;
+	ktime_t timestamp;
+};
+
+struct rcu_invoke_log {
+	int next;
+	int full;
+	unsigned size;
+	struct rcu_invoke_log_entry *entry;
+};
+
+DECLARE_PER_CPU(struct rcu_callback_log, rcu_callback_log_head);
+DECLARE_PER_CPU(struct rcu_invoke_log, rcu_invoke_callback_log);
+
+extern struct rcu_callback_log_entry *rcu_callback_log_add(void);
+extern struct rcu_invoke_log_entry *rcu_invoke_log_add(void);
+
+#endif /* #ifdef CONFIG_MTK_RCU_MONITOR */
 
 #ifdef CONFIG_RCU_TRACE
 /* Read out queue lengths for tracing. */

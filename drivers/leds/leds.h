@@ -16,6 +16,24 @@
 #include <linux/rwsem.h>
 #include <linux/leds.h>
 
+#ifndef CONFIG_LEDS_S2MU005
+extern struct class *camera_class;
+#elif defined(CONFIG_LEDS_S2MU005)
+void ss_rear_flash_led_flash_on(void);
+void ss_rear_flash_led_torch_on(void);
+void ss_rear_flash_led_turn_off(void);
+void ss_rear_torch_set_flashlight(int torch_mode);
+void ss_front_flash_led_turn_on(void);
+void ss_front_flash_led_turn_off(void);
+void s2mu005_led_enable_ctrl(int mode);
+int s2mu005_led_mode_ctrl(int enable_mode, int state);
+#else
+#endif
+
+#if defined(CONFIG_GET_REAR_MODULE_ID)
+extern void get_imx219_moduleid(u8 *data);
+#endif
+
 static inline void led_set_brightness_async(struct led_classdev *led_cdev,
 					enum led_brightness value)
 {

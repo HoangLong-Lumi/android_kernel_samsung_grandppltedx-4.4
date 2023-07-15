@@ -135,6 +135,37 @@ config MFD_CROS_EC_SPI
 	  response time cannot be guaranteed, we support ignoring
 	  'pre-amble' bytes before the response actually starts.
 
+config MFD_MADERA
+	select REGMAP
+	select MFD_CORE
+	bool
+
+config MFD_MADERA_I2C
+	tristate "Cirrus Logic Madera codecs with I2C"
+	select MFD_MADERA
+	select MADERA_IRQ
+	select REGMAP_I2C
+	depends on I2C
+	help
+	  Support for the Cirrus Logic Madera platform audio SoC
+	  core functionality controlled via I2C.
+
+config MFD_MADERA_SPI
+	tristate "Cirrus Logic Madera codecs with SPI"
+	select MFD_MADERA
+	select MADERA_IRQ
+	select REGMAP_SPI
+	depends on SPI_MASTER
+	help
+	  Support for the Cirrus Logic Madera platform audio SoC
+	  core functionality controlled via SPI.
+
+config MFD_CS47L15
+	bool "Cirrus Logic CS47L15"
+	depends on MFD_MADERA
+	help
+	  Support for Cirrus Logic CS47L15 Smart Codec
+
 config MFD_ASIC3
 	bool "Compaq ASIC3"
 	depends on GPIOLIB && ARM
@@ -930,6 +961,35 @@ config AB8500_GPADC
 	default y
 	help
 	  AB8500 GPADC driver used to convert Acc and battery/ac/usb voltage
+
+config MFD_S2MU005
+	bool "SAMSUNG Electronics IF PMIC S2MU005 Series Support"
+	depends on I2C=y
+	select MFD_CORE
+	  help
+	  Support for the Samsung Electronics MFD series.
+	  This driver provides common support for accessing the device,
+	  additional drivers must be enabled in order to use the functionality
+	  of the device
+
+config MFD_SM5705
+        bool "Siliconmitus SM5705 IFPM Support"
+        depends on I2C=y
+        select MFD_CORE
+        help
+          Say yes here to support for Siliconmitus SM5705.
+          This is a Power Management IC with USBLDO, RGB(SVC led), Dual Flash, Charger 
+          controls on chip.
+          This driver provides common support for accessing the device;
+          additional drivers
+          
+config LEDS_SM5705
+       bool "Siliconmitus SM5703 flash LED driver"
+	   depends on I2C && MFD_SM5705
+       help
+		This option enables support for on-chip LED driver on
+		Silicon-mitus SM5705 includes Torch, Flash.
+          
 
 config MFD_DB8500_PRCMU
 	bool "ST-Ericsson DB8500 Power Reset Control Management Unit"

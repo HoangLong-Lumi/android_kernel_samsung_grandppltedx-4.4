@@ -315,6 +315,10 @@ static int wb_init(struct bdi_writeback *wb, struct backing_dev_info *bdi,
 	if (!wb->congested)
 		return -ENOMEM;
 
+	bdi->last_thresh = 0;
+	bdi->last_nr_dirty = 0;
+	bdi->paused_total = 0;
+
 	err = fprop_local_init_percpu(&wb->completions, gfp);
 	if (err)
 		goto out_put_cong;

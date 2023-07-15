@@ -194,6 +194,20 @@ up_fail:
 	return PTR_ERR(ret);
 }
 
+#ifdef CONFIG_COMPAT
+/*
+ * Revisit: Remove in future if android 64bit
+ */
+void update_vsyscall(struct timekeeper *tk)
+{
+
+}
+
+void update_vsyscall_tz(void)
+{
+
+}
+#else
 /*
  * Update the vDSO data page to keep in sync with kernel timekeeping.
  */
@@ -228,3 +242,4 @@ void update_vsyscall_tz(void)
 	vdso_data->tz_minuteswest	= sys_tz.tz_minuteswest;
 	vdso_data->tz_dsttime		= sys_tz.tz_dsttime;
 }
+#endif

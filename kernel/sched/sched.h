@@ -378,6 +378,7 @@ struct cfs_rq {
 	unsigned long tg_load_avg_contrib;
 #endif
 	atomic_long_t removed_load_avg, removed_util_avg;
+	atomic_long_t removed_loadwop_avg;
 #ifndef CONFIG_64BIT
 	u64 load_last_update_time_copy;
 #endif
@@ -625,6 +626,9 @@ struct rq {
 	int active_balance;
 	int push_cpu;
 	struct cpu_stop_work active_balance_work;
+#ifdef CONFIG_SCHED_HMP
+	struct task_struct *migrate_task;
+#endif
 	/* cpu of this runqueue: */
 	int cpu;
 	int online;
@@ -901,6 +905,19 @@ extern int group_balance_cpu(struct sched_group *sg);
 static inline void sched_ttwu_pending(void) { }
 
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_SCHED_HMP
+extern struct cpumask hmp_fast_cpu_mask;
+extern struct cpumask hmp_slow_cpu_mask;
+
+extern void __init arch_get_hmp_domains(struct list_head *hmp_domains_list);
+
+static LIST_HEAD(hmp_domains);
+DECLARE_PER_CPU(struct hmp_domain *, hmp_cpu_domain);
+
+#define hmp_cpu_domain(cpu)     (per_cpu(hmp_cpu_domain, (cpu)))
+
+#endif
 
 #include "stats.h"
 #include "auto_group.h"
@@ -1310,10 +1327,21 @@ unsigned long to_ratio(u64 period, u64 runtime);
 
 extern void init_entity_runnable_average(struct sched_entity *se);
 
+#ifdef CONFIG_MTK_SCHED_RQAVG_KS
+void sched_update_nr_prod(int cpu, unsigned long nr_running, int inc);
+#endif
+
+#ifdef CONFIG_MTK_SCHED_RQAVG_US
+extern int inc_nr_heavy_running(const char *invoker, struct task_struct *p, int inc, bool ack_cap);
+#endif
+
 static inline void add_nr_running(struct rq *rq, unsigned count)
 {
 	unsigned prev_nr = rq->nr_running;
 
+#ifdef CONFIG_MTK_SCHED_RQAVG_KS
+	sched_update_nr_prod(cpu_of(rq), rq->nr_running, count);
+#endif
 	rq->nr_running = prev_nr + count;
 
 	if (prev_nr < 2 && rq->nr_running >= 2) {
@@ -1340,6 +1368,9 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 
 static inline void sub_nr_running(struct rq *rq, unsigned count)
 {
+#ifdef CONFIG_MTK_SCHED_RQAVG_KS
+	sched_update_nr_prod(cpu_of(rq), rq->nr_running, -count);
+#endif
 	rq->nr_running -= count;
 }
 
@@ -1396,24 +1427,10 @@ static inline int hrtick_enabled(struct rq *rq)
 #ifdef CONFIG_SMP
 extern void sched_avg_update(struct rq *rq);
 
-#ifndef arch_scale_freq_capacity
-static __always_inline
-unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu)
-{
-	return SCHED_CAPACITY_SCALE;
-}
-#endif
-
-#ifndef arch_scale_cpu_capacity
-static __always_inline
-unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-{
-	if (sd && (sd->flags & SD_SHARE_CPUCAPACITY) && (sd->span_weight > 1))
-		return sd->smt_gain / sd->span_weight;
-
-	return SCHED_CAPACITY_SCALE;
-}
-#endif
+extern void arch_scale_set_curr_freq(int cpu, unsigned long freq);
+extern void arch_scale_set_max_freq(int cpu, unsigned long freq);
+extern unsigned long arch_scale_freq_capacity(struct sched_domain *sd, int cpu);
+extern unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
 
 static inline void sched_rt_avg_update(struct rq *rq, u64 rt_delta)
 {
@@ -1770,6 +1787,23 @@ static inline u64 irq_time_read(int cpu)
 }
 #endif /* CONFIG_64BIT */
 #endif /* CONFIG_IRQ_TIME_ACCOUNTING */
+
+/* sched:  add for print aee log */
+#ifdef CONFIG_SMP
+static inline int rq_cpu(const struct rq *rq) { return rq->cpu; }
+#else
+static inline int rq_cpu(const struct rq *rq) { return 0; }
+#endif
+
+#ifdef TEST_SCHED_DEBUG_ENHANCEMENT
+extern void lock_timekeeper(void);
+#endif
+
+#ifdef CONFIG_SCHED_DEBUG
+extern void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq);
+#endif /* CONFIG_SCHED_DEBUG */
+
+extern void unthrottle_offline_rt_rqs(struct rq *rq);
 
 static inline void account_reset_rq(struct rq *rq)
 {

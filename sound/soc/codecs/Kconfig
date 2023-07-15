@@ -44,7 +44,9 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_ALC5623 if I2C
 	select SND_SOC_ALC5632 if I2C
 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
+	select SND_SOC_CIRRUS_AMP_CALIBRATE if SND_SOC_CS35L35
 	select SND_SOC_CS35L32 if I2C
+	select SND_SOC_CS35L35 if I2C
 	select SND_SOC_CS42L51_I2C if I2C
 	select SND_SOC_CS42L52 if I2C && INPUT
 	select SND_SOC_CS42L56 if I2C && INPUT
@@ -55,6 +57,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_CS4271_SPI if SPI_MASTER
 	select SND_SOC_CS42XX8_I2C if I2C
 	select SND_SOC_CS4349 if I2C
+	select SND_SOC_CS47L15 if MFD_CS47L15
 	select SND_SOC_CX20442 if TTY
 	select SND_SOC_DA7210 if SND_SOC_I2C_AND_SPI
 	select SND_SOC_DA7213 if I2C
@@ -179,6 +182,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_WM9705 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9712 if SND_SOC_AC97_BUS
 	select SND_SOC_WM9713 if SND_SOC_AC97_BUS
+	select SND_SOC_RT5509 if I2C
         help
           Normally ASoC codec drivers are only built if a machine driver which
           uses them is also built since they are only usable with a machine
@@ -211,9 +215,12 @@ config SND_SOC_WM_HUBS
 
 config SND_SOC_WM_ADSP
 	tristate
+	select SND_SOC_COMPRESS
+	default y if SND_SOC_MADERA=y
 	default y if SND_SOC_WM5102=y
 	default y if SND_SOC_WM5110=y
 	default y if SND_SOC_WM2200=y
+	default m if SND_SOC_MADERA=m
 	default m if SND_SOC_WM5102=m
 	default m if SND_SOC_WM5110=m
 	default m if SND_SOC_WM2200=m
@@ -355,6 +362,15 @@ config SND_SOC_CS35L32
 	tristate "Cirrus Logic CS35L32 CODEC"
 	depends on I2C
 
+config SND_SOC_CS35L35
+	tristate "Cirrus Logic CS35L35 AMP"
+	depends on I2C
+	select SND_SOC_CIRRUS_AMP_CALIBRATE
+
+config SND_SOC_CIRRUS_AMP_CALIBRATE
+	tristate "Cirrus Logic Amp Calibration"
+	depends on SND_SOC_CS35L35
+
 config SND_SOC_CS42L51
 	tristate
 
@@ -422,6 +438,10 @@ config SND_SOC_CS4349
 	tristate "Cirrus Logic CS4349 CODEC"
 	depends on I2C
 
+# Cirrus CS47L15 Codec
+config SND_SOC_CS47L15
+	tristate "Cirrus Logic CS47L15 CODEC"
+
 config SND_SOC_CX20442
 	tristate
 	depends on TTY
@@ -476,6 +496,19 @@ config SND_SOC_ISABELLE
 
 config SND_SOC_LM49453
 	tristate
+
+config SND_SOC_MADERA
+	tristate
+	default y if SND_SOC_CS47L15=y
+	default y if SND_SOC_CS47L35=y
+	default y if SND_SOC_CS47L85=y
+	default y if SND_SOC_CS47L90=y
+	default y if SND_SOC_CS47L92=y
+	default m if SND_SOC_CS47L15=m
+	default m if SND_SOC_CS47L35=m
+	default m if SND_SOC_CS47L85=m
+	default m if SND_SOC_CS47L90=m
+	default m if SND_SOC_CS47L92=m
 
 config SND_SOC_MAX98088
        tristate
@@ -892,6 +925,12 @@ config SND_SOC_WM9712
 config SND_SOC_WM9713
 	tristate
 
+config SND_SOC_MT8167_CODEC
+	tristate
+
+# DBMDx
+source "sound/soc/codecs/dbmdx/Kconfig"
+
 # Amp
 config SND_SOC_LM4857
 	tristate
@@ -915,4 +954,17 @@ config SND_SOC_TPA6130A2
 	tristate "Texas Instruments TPA6130A2 headphone amplifier"
 	depends on I2C
 
+config SND_SOC_RT5509
+	tristate "Richtek RT5509 Smart AMP"
+	depends on I2C
+	select RT_REGMAP
+
 endmenu
+
+config SND_SOC_MAX98926
+	bool "MAXIM 98926 CODEC"
+	default n
+	help
+	  for max98926 codec,enable this config will
+	  add max98926 codec driver.
+

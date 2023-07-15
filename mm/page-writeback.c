@@ -38,6 +38,7 @@
 #include <linux/sched/rt.h>
 #include <linux/mm_inline.h>
 #include <trace/events/writeback.h>
+#include <linux/version.h>
 
 #include "internal.h"
 
@@ -70,13 +71,13 @@ static long ratelimit_pages = 32;
 /*
  * Start background writeback (via writeback threads) at this percentage
  */
-int dirty_background_ratio = 10;
+int dirty_background_ratio;
 
 /*
  * dirty_background_bytes starts at 0 (disabled) so that it is a function of
  * dirty_background_ratio * the amount of dirtyable memory
  */
-unsigned long dirty_background_bytes;
+unsigned long dirty_background_bytes = 25 * 1024 * 1024;
 
 /*
  * free highmem will not be subtracted from the total free memory
@@ -87,13 +88,13 @@ int vm_highmem_is_dirtyable;
 /*
  * The generator of dirty data starts writeback at this percentage
  */
-int vm_dirty_ratio = 20;
+int vm_dirty_ratio;
 
 /*
  * vm_dirty_bytes starts at 0 (disabled) so that it is a function of
  * vm_dirty_ratio * the amount of dirtyable memory
  */
-unsigned long vm_dirty_bytes;
+unsigned long vm_dirty_bytes = 50 * 1024 * 1024;
 
 /*
  * The interval between `kupdate'-style writebacks
@@ -339,6 +340,30 @@ static unsigned long global_dirtyable_memory(void)
 
 	if (!vm_highmem_is_dirtyable)
 		x -= highmem_dirtyable_memory(x);
+
+	/*
+	 * movable zone is consider as memory backup pool,
+	 * remove movable zone from dirtyable memory count
+	 */
+	if (IS_ENABLED(CONFIG_ZONE_MOVABLE_CMA)) {
+		int node;
+		unsigned long dirtyable_memory = 0;
+
+		for_each_node(node) {
+			struct zone *z = &NODE_DATA(node)->node_zones[ZONE_MOVABLE];
+
+			dirtyable_memory += zone_dirtyable_memory(z);
+		}
+
+		if ((long)dirtyable_memory < 0)
+			dirtyable_memory = 0;
+
+		/*
+		 * Make sure that the number of movable pages is never larger
+		 * than the number of the total dirtyable memory.
+		 */
+		x -= min(x, dirtyable_memory);
+	}
 
 	return x + 1;	/* Ensure that we never return 0 */
 }
@@ -1734,6 +1759,16 @@ pause:
 					  period,
 					  pause,
 					  start_time);
+		/* Just collecting approximate value. No lock required. */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
+		bdi->last_thresh = thresh;
+		bdi->last_nr_dirty = dirty;
+#else
+		bdi->last_thresh = dirty_thresh;
+		bdi->last_nr_dirty = nr_dirty;
+#endif
+		bdi->paused_total += pause;
+
 		__set_current_state(TASK_KILLABLE);
 		io_schedule_timeout(pause);
 
@@ -1922,6 +1957,22 @@ bool wb_over_bg_thresh(struct bdi_writeback *wb)
 	return false;
 }
 
+/*
+ * Check vmstat snapshot for throttling of vm_writeout
+ */
+static unsigned long check_vm_writeout_snapshot(void)
+{
+	struct zone *z;
+	unsigned long nr_vm_writeout = 0;
+
+	for_each_populated_zone(z) {
+		nr_vm_writeout += zone_page_state_snapshot(z, NR_WRITEBACK);
+		nr_vm_writeout += zone_page_state_snapshot(z, NR_UNSTABLE_NFS);
+	}
+
+	return nr_vm_writeout;
+}
+
 void throttle_vm_writeout(gfp_t gfp_mask)
 {
 	unsigned long background_thresh;
@@ -1940,6 +1991,14 @@ void throttle_vm_writeout(gfp_t gfp_mask)
                 if (global_page_state(NR_UNSTABLE_NFS) +
 			global_page_state(NR_WRITEBACK) <= dirty_thresh)
                         	break;
+
+		/*
+		 * Take a deeper look at NR_WRITEBACK & NR_UNSTABLE_NFS
+		 * before entering congestion_wait.
+		 */
+		if (check_vm_writeout_snapshot() <= dirty_thresh)
+			break;
+
                 congestion_wait(BLK_RW_ASYNC, HZ/10);
 
 		/*

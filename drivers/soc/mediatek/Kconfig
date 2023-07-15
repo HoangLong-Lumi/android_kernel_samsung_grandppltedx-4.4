@@ -17,8 +17,8 @@ config MTK_PMIC_WRAP
 	select REGMAP
 	help
 	  Say yes here to add support for MediaTek PMIC Wrapper found
-	  on different MediaTek SoCs. The PMIC wrapper is a proprietary
-	  hardware to connect the PMIC.
+	  on different MediaTek SoCs. The PMIC wrapper is a hardware
+	  to connect the PMIC.
 
 config MTK_SCPSYS
 	bool "MediaTek SCPSYS Support"

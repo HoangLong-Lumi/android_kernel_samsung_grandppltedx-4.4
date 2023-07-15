@@ -40,6 +40,17 @@ struct pr_ops;
 #define BLKDEV_MIN_RQ	4
 #define BLKDEV_MAX_RQ	128	/* Default maximum */
 
+#if defined(CONFIG_MMC_BLOCK_IO_LOG)
+extern void mt_pidlog_map_sg(struct bio_vec *bvec, int rw);
+extern void mt_pidlog_submit_bio(struct bio *bio);
+extern void mt_pidlog_write_begin(struct page *p);
+
+#else
+#define mt_pidlog_map_sg(...)
+#define mt_pidlog_submit_bio(...)
+#define mt_pidlog_write_begin(...)
+#endif
+
 /*
  * Maximum number of blkcg policies allowed to be registered concurrently.
  * Defined here to simplify include dependency.
@@ -399,6 +410,8 @@ struct request_queue {
 
 	unsigned int		nr_sorted;
 	unsigned int		in_flight[2];
+	unsigned long long	in_flight_time;
+	ktime_t			in_flight_stamp;
 	/*
 	 * Number of active block driver functions for which blk_drain_queue()
 	 * must wait. Must be incremented around functions that unlock the
@@ -434,6 +447,7 @@ struct request_queue {
 	unsigned int		flush_flags;
 	unsigned int		flush_not_queueable:1;
 	struct blk_flush_queue	*fq;
+	unsigned long		flush_ios;
 
 	struct list_head	requeue_list;
 	spinlock_t		requeue_lock;
@@ -1145,7 +1159,8 @@ extern int blk_verify_command(unsigned char *cmd, fmode_t has_write_perm);
 enum blk_default_limits {
 	BLK_MAX_SEGMENTS	= 128,
 	BLK_SAFE_MAX_SECTORS	= 255,
-	BLK_DEF_MAX_SECTORS	= 2560,
+	/*BLK_DEF_MAX_SECTORS	= 2560, */
+	BLK_DEF_MAX_SECTORS	= 32768, /* MTK　PATCH */
 	BLK_MAX_SEGMENT_SIZE	= 65536,
 	BLK_SEG_BOUNDARY_MASK	= 0xFFFFFFFFUL,
 };

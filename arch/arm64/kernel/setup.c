@@ -63,6 +63,11 @@
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
 
+// [ SEC_SELINUX_PORTING_QUALCOMM
+#ifdef CONFIG_PROC_AVC
+#include <linux/proc_avc.h>
+#endif
+// ] SEC_SELINUX_PORTING_QUALCOMM
 phys_addr_t __fdt_pointer __initdata;
 
 /*
@@ -192,6 +197,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 			cpu_relax();
 	}
 
+	machine_desc_set(of_flat_dt_get_machine_name());
 	dump_stack_set_arch_desc("%s (DT)", of_flat_dt_get_machine_name());
 }
 
@@ -357,6 +363,12 @@ void __init setup_arch(char **cmdline_p)
 
 static int __init arm64_device_init(void)
 {
+// [ SEC_SELINUX_PORTING_QUALCOMM
+#ifdef CONFIG_PROC_AVC
+        sec_avc_log_init();
+#endif
+// ] SEC_SELINUX_PORTING_QUALCOMM
+
 	if (of_have_populated_dt()) {
 		of_iommu_init();
 		of_platform_populate(NULL, of_default_bus_match_table,

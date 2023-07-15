@@ -460,6 +460,12 @@ config BACKLIGHT_BD6107
 	help
 	  If you have a Rohm BD6107 say Y to enable the backlight driver.
 
+config ISL98611_BLIC
+	tristate "ISL98611 Backlight"
+	depends on I2C
+	help
+	  If you have a intersil ISL98611 say Y to enable the backlight driver.
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT

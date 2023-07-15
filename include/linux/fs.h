@@ -138,6 +138,12 @@ typedef void (dax_iodone_t)(struct buffer_head *bh_map, int uptodate);
 /* Has write method(s) */
 #define FMODE_CAN_WRITE         ((__force fmode_t)0x40000)
 
+/* File hasn't page cache and can't be mmaped, for stackable filesystem */
+#define FMODE_NONMAPPABLE        ((__force fmode_t)0x400000)
+ 
+/* File page don't need to be cached, for stackable filesystem's lower file */
+#define FMODE_NONCACHEABLE     ((__force fmode_t)0x800000)
+
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x4000000)
 
@@ -397,6 +403,8 @@ struct address_space_operations {
 	 */
 	int (*migratepage) (struct address_space *,
 			struct page *, struct page *, enum migrate_mode);
+	bool (*isolate_page)(struct page *, isolate_mode_t);
+	void (*putback_page)(struct page *);
 	int (*launder_page) (struct page *);
 	int (*is_partially_uptodate) (struct page *, unsigned long,
 					unsigned long);
@@ -439,6 +447,9 @@ struct address_space {
 	spinlock_t		private_lock;	/* for use by the address_space */
 	struct list_head	private_list;	/* ditto */
 	void			*private_data;	/* ditto */
+#ifdef CONFIG_SDP
+	int userid;
+#endif
 } __attribute__((aligned(sizeof(long))));
 	/*
 	 * On most architectures that alignment is already the case; but
@@ -1639,6 +1650,7 @@ struct file_operations {
 #ifndef CONFIG_MMU
 	unsigned (*mmap_capabilities)(struct file *);
 #endif
+	struct file* (*get_lower_file)(struct file *f);
 };
 
 struct inode_operations {
@@ -1723,6 +1735,7 @@ struct super_operations {
 				  struct shrink_control *);
 	long (*free_cached_objects)(struct super_block *,
 				    struct shrink_control *);
+	long (*unlink_callback)(struct super_block *, char *);
 };
 
 /*
@@ -2440,6 +2453,8 @@ static inline int generic_write_sync(struct file *file, loff_t pos, loff_t count
 }
 extern void emergency_sync(void);
 extern void emergency_remount(void);
+extern int intr_sync(int *);
+
 #ifdef CONFIG_BLOCK
 extern sector_t bmap(struct inode *, sector_t);
 #endif

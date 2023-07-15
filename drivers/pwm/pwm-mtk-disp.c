@@ -161,7 +161,6 @@ static int mtk_disp_pwm_probe(struct platform_device *pdev)
 	struct mtk_disp_pwm *mdp;
 	struct resource *r;
 	int ret;
-
 	mdp = devm_kzalloc(&pdev->dev, sizeof(*mdp), GFP_KERNEL);
 	if (!mdp)
 		return -ENOMEM;
@@ -199,7 +198,6 @@ static int mtk_disp_pwm_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, mdp);
-
 	return 0;
 
 disable_clk_mm:
@@ -224,6 +222,7 @@ static int mtk_disp_pwm_remove(struct platform_device *pdev)
 static const struct of_device_id mtk_disp_pwm_of_match[] = {
 	{ .compatible = "mediatek,mt8173-disp-pwm" },
 	{ .compatible = "mediatek,mt6595-disp-pwm" },
+	{ .compatible = "mediatek,disp_pwm" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, mtk_disp_pwm_of_match);

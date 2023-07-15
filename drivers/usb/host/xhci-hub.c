@@ -27,6 +27,10 @@
 #include "xhci.h"
 #include "xhci-trace.h"
 
+#ifdef CONFIG_USB_XHCI_MTK
+#include "xhci-mtk.h"
+#endif
+
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
 #define	PORT_RWC_BITS	(PORT_CSC | PORT_PEC | PORT_WRC | PORT_OCC | \
 			 PORT_RC | PORT_PLC | PORT_PE)
@@ -377,6 +381,10 @@ static int xhci_stop_device(struct xhci_hcd *xhci, int slot_id, int suspend)
 
 	ret = 0;
 	virt_dev = xhci->devs[slot_id];
+
+	if (!virt_dev)
+		return -ENODEV;
+
 	cmd = xhci_alloc_command(xhci, false, true, GFP_NOIO);
 	if (!cmd) {
 		xhci_dbg(xhci, "Couldn't allocate command structure.\n");
@@ -973,7 +981,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			}
 			/* In spec software should not attempt to suspend
 			 * a port unless the port reports that it is in the
-			 * enabled (PED = ‘1’,PLS < ‘3’) state.
+			 * enabled (PED = ????PLS < ???? state.
 			 */
 			temp = readl(port_array[wIndex]);
 			if ((temp & PORT_PE) == 0 || (temp & PORT_RESET)
@@ -1340,6 +1348,23 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 	hcd->state = HC_STATE_SUSPENDED;
 	bus_state->next_statechange = jiffies + msecs_to_jiffies(10);
 	spin_unlock_irqrestore(&xhci->lock, flags);
+#ifdef CONFIG_USB_XHCI_MTK
+#ifdef CONFIG_USB_XHCI_MTK_SUSPEND_SUPPORT
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		xhci_info(xhci, "xhci_bus_suspend_unlock = %d %d\n",
+			 hcd->self.root_hub->do_remote_wakeup, max_ports);
+		mtk_xhci_wakelock_unlock();
+	}
+#else
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		if ((hcd->state == HC_STATE_SUSPENDED) && (hcd->shared_hcd->state == HC_STATE_SUSPENDED)) {
+			xhci_info(xhci, "xhci_bus_suspend_deepidle = %d %d\n",
+				 hcd->self.root_hub->do_remote_wakeup, max_ports);
+			usb_wakeup_deepidle_enable(hcd);
+		}
+	}
+#endif
+#endif
 	return 0;
 }
 
@@ -1358,6 +1383,16 @@ int xhci_bus_resume(struct usb_hcd *hcd)
 
 	max_ports = xhci_get_ports(hcd, &port_array);
 	bus_state = &xhci->bus_state[hcd_index(hcd)];
+
+#ifdef CONFIG_USB_XHCI_MTK
+#ifndef CONFIG_USB_XHCI_MTK_SUSPEND_SUPPORT
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		xhci_info(xhci, "xhci_bus_resume_deepidle = %d %d\n",
+			 hcd->self.root_hub->do_remote_wakeup, max_ports);
+		usb_wakeup_deepidle_disable(hcd);
+	}
+#endif
+#endif
 
 	if (time_before(jiffies, bus_state->next_statechange))
 		msleep(5);
@@ -1395,6 +1430,13 @@ int xhci_bus_resume(struct usb_hcd *hcd)
 		} else
 			writel(temp, port_array[port_index]);
 	}
+#ifdef CONFIG_USB_XHCI_MTK_SUSPEND_SUPPORT
+	if (hcd->self.root_hub->do_remote_wakeup == 1) {
+		xhci_info(xhci, "xhci_bus_resume_lock = %d %d\n",
+			 hcd->self.root_hub->do_remote_wakeup, max_ports);
+		mtk_xhci_wakelock_lock();
+	}
+#endif
 
 	if (need_usb2_u3_exit) {
 		spin_unlock_irqrestore(&xhci->lock, flags);

@@ -179,6 +179,7 @@ struct ethtool_drvinfo {
 	char	fw_version[ETHTOOL_FWVERS_LEN];
 	char	bus_info[ETHTOOL_BUSINFO_LEN];
 	char	erom_version[ETHTOOL_EROMVERS_LEN];
+	char	reserved1[32];
 	char	reserved2[12];
 	__u32	n_priv_flags;
 	__u32	n_stats;

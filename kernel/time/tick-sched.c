@@ -36,6 +36,24 @@
  */
 static DEFINE_PER_CPU(struct tick_sched, tick_cpu_sched);
 
+struct tick_sched saved_pcpu_ts[NR_CPUS];
+
+void save_pcpu_tick(int cpu)
+{
+	saved_pcpu_ts[cpu] = per_cpu(tick_cpu_sched, cpu);
+	kcpustat_cpu(cpu).cpustat[CPUTIME_IDLE] = usecs_to_cputime64(ktime_to_us(saved_pcpu_ts[cpu].idle_sleeptime));
+	kcpustat_cpu(cpu).cpustat[CPUTIME_IOWAIT] = usecs_to_cputime64(ktime_to_us(saved_pcpu_ts[cpu].iowait_sleeptime));
+}
+EXPORT_SYMBOL(save_pcpu_tick);
+
+void restore_pcpu_tick(int cpu)
+{
+	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
+	ts->idle_sleeptime = saved_pcpu_ts[cpu].idle_sleeptime;
+	ts->iowait_sleeptime = saved_pcpu_ts[cpu].iowait_sleeptime;
+}
+EXPORT_SYMBOL(restore_pcpu_tick);
+
 /*
  * The time, when the last jiffy update happened. Protected by jiffies_lock.
  */
@@ -455,9 +473,40 @@ update_ts_time_stats(int cpu, struct tick_sched *ts, ktime_t now, u64 *last_upda
 
 }
 
+#ifdef CONFIG_MEDIATEK_SOLUTION
+static void
+update_ts_time_stats_wo_cpuoffline(int cpu, struct tick_sched *ts, ktime_t now, u64 *last_update_time)
+{
+	ktime_t delta;
+
+	if (ts->idle_active && (!ts->cpu_plug_off_flag)) {
+		delta = ktime_sub(now, ts->idle_entrytime_wo_cpuoffline);
+		if (nr_iowait_cpu(cpu) > 0)
+			ts->iowait_sleeptime_wo_cpuoffline = ktime_add(ts->iowait_sleeptime_wo_cpuoffline, delta);
+		else
+			ts->idle_sleeptime_wo_cpuoffline = ktime_add(ts->idle_sleeptime_wo_cpuoffline, delta);
+		ts->idle_entrytime_wo_cpuoffline = now;
+	}
+
+	if (last_update_time)
+		*last_update_time = ktime_to_us(now);
+
+}
+
+void tick_set_cpu_plugoff_flag(int flag)
+{
+	struct tick_sched *ts = this_cpu_ptr(&tick_cpu_sched);
+
+	ts->cpu_plug_off_flag = flag;
+}
+#endif
+
 static void tick_nohz_stop_idle(struct tick_sched *ts, ktime_t now)
 {
 	update_ts_time_stats(smp_processor_id(), ts, now, NULL);
+#ifdef CONFIG_MEDIATEK_SOLUTION
+	update_ts_time_stats_wo_cpuoffline(smp_processor_id(), ts, now, NULL);
+#endif
 	ts->idle_active = 0;
 
 	sched_clock_idle_wakeup_event(0);
@@ -468,6 +517,9 @@ static ktime_t tick_nohz_start_idle(struct tick_sched *ts)
 	ktime_t now = ktime_get();
 
 	ts->idle_entrytime = now;
+#ifdef CONFIG_MEDIATEK_SOLUTION
+	ts->idle_entrytime_wo_cpuoffline = now;
+#endif
 	ts->idle_active = 1;
 	sched_clock_idle_sleep_event();
 	return now;
@@ -514,6 +566,35 @@ u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time)
 }
 EXPORT_SYMBOL_GPL(get_cpu_idle_time_us);
 
+#ifdef CONFIG_MEDIATEK_SOLUTION
+u64 get_cpu_idle_time_us_wo_cpuoffline(int cpu, u64 *last_update_time)
+{
+	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
+	ktime_t now, idle;
+
+	if (!tick_nohz_active)
+		return -1;
+
+	now = ktime_get();
+	if (last_update_time) {
+		update_ts_time_stats_wo_cpuoffline(cpu, ts, now, last_update_time);
+		idle = ts->idle_sleeptime_wo_cpuoffline;
+	} else {
+		if (ts->idle_active && !nr_iowait_cpu(cpu) && cpu_online(cpu) && (!ts->cpu_plug_off_flag)) {
+			ktime_t delta = ktime_sub(now, ts->idle_entrytime_wo_cpuoffline);
+
+			idle = ktime_add(ts->idle_sleeptime_wo_cpuoffline, delta);
+		} else {
+			idle = ts->idle_sleeptime_wo_cpuoffline;
+		}
+	}
+
+	return ktime_to_us(idle);
+
+}
+EXPORT_SYMBOL_GPL(get_cpu_idle_time_us_wo_cpuoffline);
+#endif
+
 /**
  * get_cpu_iowait_time_us - get the total iowait time of a cpu
  * @cpu: CPU number to query
@@ -553,6 +634,34 @@ u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time)
 	return ktime_to_us(iowait);
 }
 EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us);
+
+#ifdef CONFIG_MEDIATEK_SOLUTION
+u64 get_cpu_iowait_time_us_wo_cpuoffline(int cpu, u64 *last_update_time)
+{
+	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
+	ktime_t now, iowait;
+
+	if (!tick_nohz_enabled)
+		return -1;
+
+	now = ktime_get();
+	if (last_update_time) {
+		update_ts_time_stats_wo_cpuoffline(cpu, ts, now, last_update_time);
+		iowait = ts->iowait_sleeptime_wo_cpuoffline;
+	} else {
+		if (ts->idle_active && nr_iowait_cpu(cpu) > 0 && cpu_online(cpu) && (!ts->cpu_plug_off_flag)) {
+			ktime_t delta = ktime_sub(now, ts->idle_entrytime_wo_cpuoffline);
+
+			iowait = ktime_add(ts->iowait_sleeptime_wo_cpuoffline, delta);
+		} else {
+			iowait = ts->iowait_sleeptime_wo_cpuoffline;
+		}
+	}
+
+	return ktime_to_us(iowait);
+}
+EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us_wo_cpuoffline);
+#endif
 
 static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
 {
@@ -836,6 +945,10 @@ void tick_nohz_idle_enter(void)
 	ts = this_cpu_ptr(&tick_cpu_sched);
 	ts->inidle = 1;
 	__tick_nohz_idle_enter(ts);
+
+#ifdef CONFIG_MEDIATEK_SOLUTION
+	tick_set_cpu_plugoff_flag(0);
+#endif
 
 	local_irq_enable();
 }

@@ -782,5 +782,20 @@ endif
 dtstree		:= $(srctree)/$(src)
 dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dtstree)/*.dts))
 
-always		:= $(dtb-y)
+DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
+#
+numbers := 0 1 2 3 4 5 6 7 8 9
+DTB_NAMES_EXT := $(foreach x,$(numbers),$(foreach y,$(numbers),$(if $(wildcard $(srctree)/arch/arm/boot/dts/$(DTB_NAMES)_$(x)$(y).dts),$(DTB_NAMES)_$(x)$(y))))
+DTB_NAMES := $(strip $(DTB_NAMES) $(DTB_NAMES_EXT))
+
+ifneq ($(DTB_NAMES),)
+DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
+else
+DTB_LIST := $(dtb-y)
+endif
+
+targets += dtbs dtbs_install
+targets += $(DTB_LIST)
+
+always		:= $(DTB_LIST)
 clean-files	:= *.dtb

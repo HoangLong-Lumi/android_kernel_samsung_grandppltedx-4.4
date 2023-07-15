@@ -25,6 +25,7 @@ struct mmc_gpio {
 	struct gpio_desc *cd_gpio;
 	bool override_ro_active_level;
 	bool override_cd_active_level;
+	bool status;
 	irqreturn_t (*cd_gpio_isr)(int irq, void *dev_id);
 	char *ro_label;
 	char cd_label[0];
@@ -34,8 +35,22 @@ static irqreturn_t mmc_gpio_cd_irqt(int irq, void *dev_id)
 {
 	/* Schedule a card detection after a debounce timeout */
 	struct mmc_host *host = dev_id;
+	struct mmc_gpio *ctx = host->slot.handler_priv;
+	bool status;
 
+	status = mmc_gpio_get_cd(host) ? true : false;
+
+	pr_err("%s: slot status change detected (%d -> %d), GPIO_ACTIVE_%s\n",
+			mmc_hostname(host), ctx->status, status,
+			(host->caps2 & MMC_CAP2_CD_ACTIVE_HIGH) ?
+			"HIGH" : "LOW");
+
+	ctx->status = status;
 	host->trigger_card_event = true;
+
+	if (host->card_detect_cnt < 0x7FFFFFFF)
+		host->card_detect_cnt++;
+
 	mmc_detect_change(host, msecs_to_jiffies(200));
 
 	return IRQ_HANDLED;
@@ -145,6 +160,8 @@ void mmc_gpiod_request_cd_irq(struct mmc_host *host)
 			ctx->cd_label, host);
 		if (ret < 0)
 			irq = ret;
+		else
+			enable_irq_wake(irq);
 	}
 
 	host->slot.cd_irq = irq;
@@ -253,6 +270,7 @@ int mmc_gpiod_request_cd(struct mmc_host *host, const char *con_id,
 
 	ctx->override_cd_active_level = override_active_level;
 	ctx->cd_gpio = desc;
+	ctx->status = mmc_gpio_get_cd(host) ? true : false;
 
 	return 0;
 }

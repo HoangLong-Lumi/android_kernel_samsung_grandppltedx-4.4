@@ -21,8 +21,11 @@
 #include <linux/err.h>
 
 #include "u_serial.h"
+#ifdef CONFIG_USB_DUN_SUPPORT
+#include "serial_acm.c"
+#endif
 
-
+#define ACM_LOG "USB_ACM"
 /*
  * This CDC ACM function support just wraps control functions and
  * notifications around the generic serial-over-usb code.
@@ -333,6 +336,10 @@ static void acm_complete_set_line_coding(struct usb_ep *ep,
 		 * nothing unless we control a real RS232 line.
 		 */
 		acm->port_line_coding = *value;
+
+		pr_notice("[XLOG_INFO][USB_ACM] %s: rate=%d, stop=%d, parity=%d, data=%d\n", __func__,
+				acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
+				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits);
 	}
 }
 
@@ -354,6 +361,10 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 * to them by stalling.  Options include get/set/clear comm features
 	 * (not that useful) and SEND_BREAK.
 	 */
+
+	pr_notice("[XLOG_INFO][USB_ACM]%s: ttyGS%d req%02x.%02x v%04x i%04x len=%d\n", __func__,
+			acm->port_num, ctrl->bRequestType, ctrl->bRequest, w_value, w_index, w_length);
+
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 
 	/* SET_LINE_CODING ... just read and save what the host sends */
@@ -377,6 +388,11 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		value = min_t(unsigned, w_length,
 				sizeof(struct usb_cdc_line_coding));
 		memcpy(req->buf, &acm->port_line_coding, value);
+
+		pr_notice("[XLOG_INFO][USB_ACM]%s: rate=%d,stop=%d,parity=%d,data=%d\n", __func__,
+				acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
+				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits);
+
 		break;
 
 	/* SET_CONTROL_LINE_STATE ... save what the host sent */
@@ -392,6 +408,9 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		 * that bit, we should return to that no-flow state.
 		 */
 		acm->port_handshake_bits = w_value;
+#ifdef CONFIG_USB_DUN_SUPPORT
+		notify_control_line_state((unsigned long)w_value);
+#endif
 		break;
 
 	default:
@@ -428,18 +447,21 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* we know alt == 0, so this is an activation or a reset */
 
 	if (intf == acm->ctrl_id) {
-		dev_vdbg(&cdev->gadget->dev,
-				"reset acm control interface %d\n", intf);
-		usb_ep_disable(acm->notify);
+		if (acm->notify->driver_data) {
+			dev_vdbg(&cdev->gadget->dev,
+					"reset acm control interface %d\n", intf);
+			usb_ep_disable(acm->notify);
+		}
 
 		if (!acm->notify->desc)
 			if (config_ep_by_speed(cdev->gadget, f, acm->notify))
 				return -EINVAL;
 
 		usb_ep_enable(acm->notify);
+		acm->notify->driver_data = acm;
 
 	} else if (intf == acm->data_id) {
-		if (acm->notify->enabled) {
+		if (acm->port.in->driver_data) {
 			dev_dbg(&cdev->gadget->dev,
 				"reset acm ttyGS%d\n", acm->port_num);
 			gserial_disconnect(&acm->port);
@@ -469,9 +491,11 @@ static void acm_disable(struct usb_function *f)
 	struct f_acm	*acm = func_to_acm(f);
 	struct usb_composite_dev *cdev = f->config->cdev;
 
+	INFO(cdev, "acm ttyGS%d deactivated\n", acm->port_num);
 	dev_dbg(&cdev->gadget->dev, "acm ttyGS%d deactivated\n", acm->port_num);
 	gserial_disconnect(&acm->port);
 	usb_ep_disable(acm->notify);
+	acm->notify->driver_data = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -535,8 +559,10 @@ static int acm_notify_serial_state(struct f_acm *acm)
 {
 	struct usb_composite_dev *cdev = acm->port.func.config->cdev;
 	int			status;
+	unsigned long	flags;
 
-	spin_lock(&acm->lock);
+	spin_lock_irqsave(&acm->lock, flags);
+
 	if (acm->notify_req) {
 		dev_dbg(&cdev->gadget->dev, "acm ttyGS%d serial state %04x\n",
 			acm->port_num, acm->serial_state);
@@ -546,7 +572,7 @@ static int acm_notify_serial_state(struct f_acm *acm)
 		acm->pending = true;
 		status = 0;
 	}
-	spin_unlock(&acm->lock);
+	spin_unlock_irqrestore(&acm->lock, flags);
 	return status;
 }
 
@@ -554,20 +580,36 @@ static void acm_cdc_notify_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_acm		*acm = req->context;
 	u8			doit = false;
+	unsigned long	flags;
 
 	/* on this call path we do NOT hold the port spinlock,
 	 * which is why ACM needs its own spinlock
 	 */
-	spin_lock(&acm->lock);
+	spin_lock_irqsave(&acm->lock, flags);
 	if (req->status != -ESHUTDOWN)
 		doit = acm->pending;
 	acm->notify_req = req;
-	spin_unlock(&acm->lock);
+	spin_unlock_irqrestore(&acm->lock, flags);
 
 	if (doit)
 		acm_notify_serial_state(acm);
 }
 
+#ifdef CONFIG_USB_DUN_SUPPORT
+int acm_notify(void *dev, u16 state)
+{
+	struct f_acm	*acm;
+	if (dev) {
+		acm = (struct f_acm *)dev;
+		acm->serial_state = state;
+		acm_notify_serial_state(acm);
+	} else {
+		printk(KERN_DEBUG "usb: %s not ready\n", __func__);
+		return -EAGAIN;
+	}
+	return 0;
+}
+#endif
 /* connect == the TTY link is open */
 
 static void acm_connect(struct gserial *port)
@@ -608,7 +650,6 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct usb_composite_dev *cdev = c->cdev;
 	struct f_acm		*acm = func_to_acm(f);
-	struct usb_string	*us;
 	int			status;
 	struct usb_ep		*ep;
 
@@ -617,13 +658,28 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	 */
 
 	/* maybe allocate device-global string IDs, and patch descriptors */
-	us = usb_gstrings_attach(cdev, acm_strings,
-			ARRAY_SIZE(acm_string_defs));
-	if (IS_ERR(us))
-		return PTR_ERR(us);
-	acm_control_interface_desc.iInterface = us[ACM_CTRL_IDX].id;
-	acm_data_interface_desc.iInterface = us[ACM_DATA_IDX].id;
-	acm_iad_descriptor.iFunction = us[ACM_IAD_IDX].id;
+	if (acm_string_defs[ACM_CTRL_IDX].id == 0) {
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		acm_string_defs[ACM_CTRL_IDX].id = status;
+
+		acm_control_interface_desc.iInterface = status;
+
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		acm_string_defs[ACM_DATA_IDX].id = status;
+
+		acm_data_interface_desc.iInterface = status;
+
+		status = usb_string_id(c->cdev);
+		if (status < 0)
+			return status;
+		acm_string_defs[ACM_IAD_IDX].id = status;
+
+		acm_iad_descriptor.iFunction = status;
+	}
 
 	/* allocate instance-specific interface IDs, and patch descriptors */
 	status = usb_interface_id(c, f);
@@ -651,16 +707,19 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	if (!ep)
 		goto fail;
 	acm->port.in = ep;
+	ep->driver_data = cdev;	/* claim */
 
 	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_out_desc);
 	if (!ep)
 		goto fail;
 	acm->port.out = ep;
+	ep->driver_data = cdev;	/* claim */
 
 	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_notify_desc);
 	if (!ep)
 		goto fail;
 	acm->notify = ep;
+	ep->driver_data = cdev;	/* claim */
 
 	/* allocate notification */
 	acm->notify_req = gs_alloc_req(ep,
@@ -689,6 +748,12 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	if (status)
 		goto fail;
 
+	pr_notice("[XLOG_INFO][USB_ACM]%s: ttyGS%d: %s speed IN/%s OUT/%s NOTIFY/%s\n",
+			__func__, acm->port_num,
+			gadget_is_superspeed(c->cdev->gadget) ? "super" :
+			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
+			acm->port.in->name, acm->port.out->name, acm->notify->name);
+
 	dev_dbg(&cdev->gadget->dev,
 		"acm ttyGS%d: %s speed IN/%s OUT/%s NOTIFY/%s\n",
 		acm->port_num,
@@ -696,6 +761,9 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 		gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
 		acm->port.in->name, acm->port.out->name,
 		acm->notify->name);
+#ifdef CONFIG_USB_DUN_SUPPORT
+	modem_register(acm);
+#endif
 	return 0;
 
 fail:
@@ -711,10 +779,18 @@ static void acm_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct f_acm		*acm = func_to_acm(f);
 
+	/* acm_string_defs[].id is limited to 256
+	if id is cleared on disconneting, The increased number is allocated on connecting.
+	ACM driver can't connect to host when id is over 256 */
+#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	acm_string_defs[0].id = 0;
+#endif
 	usb_free_all_descriptors(f);
 	if (acm->notify_req)
 		gs_free_req(acm->notify, acm->notify_req);
+#ifdef CONFIG_USB_DUN_SUPPORT
+	modem_unregister();
+#endif
 }
 
 static void acm_free_func(struct usb_function *f)
@@ -748,6 +824,15 @@ static struct usb_function *acm_alloc_func(struct usb_function_instance *fi)
 	acm->port.func.disable = acm_disable;
 
 	opts = container_of(fi, struct f_serial_opts, func_inst);
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+	acm->port.func.name = kasprintf(GFP_KERNEL, "acm%u", opts->port_num);
+	if (!acm->port.func.name) {
+		kfree(acm);
+		return ERR_PTR(-ENOMEM);
+	}
+#else
+	acm->port.func.name = "acm";
+#endif
 	acm->port_num = opts->port_num;
 	acm->port.func.unbind = acm_unbind;
 	acm->port.func.free_func = acm_free_func;
@@ -818,4 +903,27 @@ static struct usb_function_instance *acm_alloc_instance(void)
 	return &opts->func_inst;
 }
 DECLARE_USB_FUNCTION_INIT(acm, acm_alloc_instance, acm_alloc_func);
+
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+static int __init acm_init(void)
+{
+#ifdef CONFIG_USB_DUN_SUPPORT
+	int err;
+	err = modem_misc_register();
+	if (err) {
+		printk(KERN_ERR "usb: %s modem misc register is failed\n",
+				__func__);
+		return err;
+	}
+#endif
+	return usb_function_register(&acmusb_func);
+}
+static void __exit acm_exit(void)
+{
+	return usb_function_unregister(&acmusb_func);
+}
+module_init(acm_init);
+module_exit(acm_exit);
+#endif
+
 MODULE_LICENSE("GPL");

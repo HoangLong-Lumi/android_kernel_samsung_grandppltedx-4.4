@@ -24,6 +24,7 @@
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
 
+#include <mt-plat/mtk_ccci_common.h>
 #include "tick-internal.h"
 #include "ntp_internal.h"
 #include "timekeeping_internal.h"
@@ -940,7 +941,7 @@ out:
 
 	/* signal hrtimers about time change */
 	clock_was_set();
-
+	notify_time_update();
 	return ret;
 }
 EXPORT_SYMBOL(do_settimeofday64);
@@ -1278,6 +1279,10 @@ static void __timekeeping_inject_sleeptime(struct timekeeper *tk,
 	tk_xtime_add(tk, delta);
 	tk_set_wall_to_mono(tk, timespec64_sub(tk->wall_to_monotonic, *delta));
 	tk_update_sleep_time(tk, timespec64_to_ktime(*delta));
+#ifdef CONFIG_SEC_PM
+	printk("Suspended for %lu.%03lu seconds\n",
+			delta->tv_sec, delta->tv_nsec / NSEC_PER_MSEC);
+#endif
 	tk_debug_account_sleep_time(delta);
 }
 

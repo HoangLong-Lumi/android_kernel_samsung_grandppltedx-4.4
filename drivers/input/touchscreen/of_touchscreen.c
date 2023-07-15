@@ -14,6 +14,28 @@
 #include <linux/input/mt.h>
 #include <linux/input/touchscreen.h>
 
+/*add for touchscreen compatible by wxj in 2017.3.21*/
+#include <linux/atomic.h>
+static atomic_t touchscreen_load_status;
+
+int touchscreen_load_status_check(void)
+{
+	return (atomic_read(&touchscreen_load_status) > 0) ? 1 : 0;
+}
+EXPORT_SYMBOL(touchscreen_load_status_check);
+
+void touchscreen_load_status_set(void)
+{
+	atomic_inc(&touchscreen_load_status);
+}
+EXPORT_SYMBOL(touchscreen_load_status_set);
+
+void touchscreen_load_status_clear(void)
+{
+	atomic_dec(&touchscreen_load_status);
+}
+EXPORT_SYMBOL(touchscreen_load_status_clear);
+/*end*/
 static bool touchscreen_get_prop_u32(struct device *dev,
 				     const char *property,
 				     unsigned int default_value,

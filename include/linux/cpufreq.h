@@ -177,6 +177,21 @@ static inline unsigned int cpufreq_quick_get_max(unsigned int cpu)
 static inline void disable_cpufreq(void) { }
 #endif
 
+#if defined (CONFIG_CPU_FREQ_LIMIT_USERSPACE)
+enum {
+	DVFS_NO_ID			= 0,
+
+	/* need to update now */
+	DVFS_TOUCH_ID			= 0x00000001,
+	DVFS_FINGER_ID			= 0x00000002,
+	DVFS_SDCHG_ID			= 0x00000004, // CONFIG_SW_SELF_DISCHARGING
+
+	DVFS_MAX_ID
+};
+
+int set_freq_limit(unsigned long id, unsigned int freq);
+#endif
+
 /*********************************************************************
  *                      CPUFREQ DRIVER INTERFACE                     *
  *********************************************************************/
@@ -487,6 +502,9 @@ extern struct cpufreq_governor cpufreq_gov_ondemand;
 #elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE)
 extern struct cpufreq_governor cpufreq_gov_conservative;
 #define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_conservative)
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_INTERACTIVE)
+extern struct cpufreq_governor cpufreq_gov_interactive;
+#define CPUFREQ_DEFAULT_GOVERNOR	(&cpufreq_gov_interactive)
 #endif
 
 /*********************************************************************

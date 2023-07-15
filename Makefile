@@ -248,8 +248,8 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 # "make" in the configured kernel build directory always uses that.
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
-ARCH		?= $(SUBARCH)
-CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
+ARCH            ?= arm64
+CROSS_COMPILE   ?= ../PLATFORM/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/bin/aarch64-linux-android-
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -383,7 +383,8 @@ LINUXINCLUDE    := \
 		-Iarch/$(hdr-arch)/include/generated \
 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
 		-Iinclude \
-		$(USERINCLUDE)
+		$(USERINCLUDE)\
+		-I$(srctree)/drivers/misc/mediatek/include
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 
@@ -461,6 +462,30 @@ asm-generic:
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
 	            src=uapi/asm obj=arch/$(SRCARCH)/include/generated/uapi/asm
 
+ifneq ($(PLATFORM_VERSION), )
+PLATFORM_VERSION_NUMBER=$(shell $(CONFIG_SHELL) $(srctree)/scripts/android-version.sh $(PLATFORM_VERSION))
+MAJOR_VERSION=$(shell $(CONFIG_SHELL) $(srctree)/scripts/android-major-version.sh $(PLATFORM_VERSION))
+export ANDROID_VERSION=$(PLATFORM_VERSION_NUMBER)
+export ANDROID_MAJOR_VERSION=$(MAJOR_VERSION)
+KBUILD_CFLAGS += -DANDROID_VERSION=$(PLATFORM_VERSION_NUMBER)
+KBUILD_CFLAGS += -DANDROID_MAJOR_VERSION=$(MAJOR_VERSION)
+# Example
+#SELINUX_DIR=$(shell $(CONFIG_SHELL) $(srctree)/scripts/find_matching_major.sh "$(srctree)" "security/selinux" "$(ANDROID_MAJOR_VERSION)")
+else
+export ANDROID_VERSION=990000
+KBUILD_CFLAGS += -DANDROID_VERSION=990000
+endif
+PHONY += replace_dirs
+replace_dirs:
+ifneq ($(PLATFORM_VERSION), )
+# Example
+#	@echo "replace selinux from $(SELINUX_DIR)"
+#	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/replace_dir.sh "$(srctree)" "security/selinux" "$(SELINUX_DIR)"
+endif
+
+$(info ANDROID_VERSION = $(ANDROID_VERSION))
+$(info ANDROID_MAJOR_VERSION = $(ANDROID_MAJOR_VERSION))
+
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to scripts/kconfig/Makefile
 # It is allowed to specify more targets when calling make, including
@@ -524,10 +549,10 @@ ifeq ($(config-targets),1)
 include arch/$(SRCARCH)/Makefile
 export KBUILD_DEFCONFIG KBUILD_KCONFIG
 
-config: scripts_basic outputmakefile FORCE
+config: scripts_basic outputmakefile replace_dirs FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
-%config: scripts_basic outputmakefile FORCE
+%config: scripts_basic outputmakefile replace_dirs FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 else
@@ -780,11 +805,31 @@ endif
 include scripts/Makefile.kasan
 include scripts/Makefile.extrawarn
 
+#Disable the whole of the following block to disable LKM AUTH
+ifeq ($(CONFIG_TIMA_LKMAUTH),y)
+ifeq ($(CONFIG_TIMA),y)
+ifeq ($(CONFIG_BLOWFISH),y)
+    KBUILD_CFLAGS += -DTIMA_LKM_AUTH_ENABLED -DTIMA_LKM_BLOWFISH
+else
+    KBUILD_CFLAGS += -DTIMA_LKM_AUTH_ENABLED
+    KBUILD_AFLAGS += -DTIMA_LKM_AUTH_ENABLED
+endif
+endif
+endif
+
 # Add any arch overrides and user supplied CPPFLAGS, AFLAGS and CFLAGS as the
 # last assignments
 KBUILD_CPPFLAGS += $(ARCH_CPPFLAGS) $(KCPPFLAGS)
 KBUILD_AFLAGS   += $(ARCH_AFLAGS)   $(KAFLAGS)
 KBUILD_CFLAGS   += $(ARCH_CFLAGS)   $(KCFLAGS)
+
+ifeq ($(CONFIG_SENSORS_FINGERPRINT), y)
+ifneq ($(CONFIG_SEC_FACTORY), true)
+ifneq ($(SEC_BUILD_CONF_USE_FINGERPRINT_TZ), false)
+    export KBUILD_FP_SENSOR_CFLAGS := -DENABLE_SENSORS_FPRINT_SECURE
+endif
+endif
+endif
 
 # Use --build-id when available.
 LDFLAGS_BUILD_ID = $(patsubst -Wl$(comma)%,%,\

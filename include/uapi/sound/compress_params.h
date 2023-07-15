@@ -73,7 +73,8 @@
 #define SND_AUDIOCODEC_IEC61937              ((__u32) 0x0000000B)
 #define SND_AUDIOCODEC_G723_1                ((__u32) 0x0000000C)
 #define SND_AUDIOCODEC_G729                  ((__u32) 0x0000000D)
-#define SND_AUDIOCODEC_MAX                   SND_AUDIOCODEC_G729
+#define SND_AUDIOCODEC_BESPOKE               ((__u32) 0x0000000E)
+#define SND_AUDIOCODEC_MAX                   SND_AUDIOCODEC_BESPOKE
 
 /*
  * Profile and modes are listed with bit masks. This allows for a
@@ -229,7 +230,8 @@
 #define SND_AUDIOMODE_G729_ANNEX_B           ((__u32) 0x00000002)
 
 /* <FIXME: multichannel encoders aren't supported for now. Would need
-   an additional definition of channel arrangement> */
+ *   an additional definition of channel arrangement>
+ */
 
 /* VBR/CBR definitions */
 #define SND_RATECONTROLMODE_CONSTANTBITRATE  ((__u32) 0x00000001)

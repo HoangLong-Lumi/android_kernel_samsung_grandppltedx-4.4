@@ -136,6 +136,27 @@ fw-shipped-$(CONFIG_USB_VICAM) += vicam/firmware.fw
 fw-shipped-$(CONFIG_VIDEO_CPIA2) += cpia2/stv0672_vp4.bin
 fw-shipped-$(CONFIG_YAM) += yam/1200.bin yam/9600.bin
 
+fw-shipped-$(CONFIG_TOUCHSCREEN_SYNAPTICS_INCELL) += tsp_synaptics/td4300_on7xelte.fw \
+						tsp_synaptics/td4303_j7maxlte_recovery.fw \
+						tsp_synaptics/td4303_j7maxlte.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_MELFAS_MMS438) += tsp_melfas/mms438_j7x.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_SEC_TS_Y661) += tsp_sec/y661_c10.fw
+fw-shipped-$(CONFIG_TOUCHSCREEN_IST3038H) += tsp_imagis/ist3038h_jade.fw \
+					tsp_imagis/ist3038h_jade_cmcs.bin
+fw-shipped-$(CONFIG_KEYBOARD_TC3XXK) += coreriver/tc305k_j7maxlte.fw \
+					coreriver/tc305k_jade.fw
+fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH_FT16XX)	+= abov/abov_tk_C10.fw
+fw-shipped-$(CONFIG_KEYBOARD_ABOV_TOUCH_3X6) += abov/abov_t316_jade.fw \
+						abov/abov_t316_C10.fw \
+						abov/abov_t316_jadechn.fw \
+						abov/abov_t316_C10chn.fw \
+						abov/abov_t326_jade.fw \
+						abov/abov_t326_jade_rev0.fw
+
+#Sensor Hub
+fw-shipped-$(CONFIG_SENSORS_SSP_STM32) += ssp_stm32f410.fw ssp_stm32f410_old.fw 
+fw-shipped-$(CONFIG_SENSORS_SSP_STM32) += ssp_crashed.fw
+
 fw-shipped-all := $(fw-shipped-y) $(fw-shipped-m) $(fw-shipped-)
 
 quiet_cmd_ihex  = IHEX    $@

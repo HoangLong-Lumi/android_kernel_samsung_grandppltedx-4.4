@@ -25,12 +25,15 @@
 #include <linux/vmalloc.h>
 #include "ion.h"
 #include "ion_priv.h"
+#include "mtk/mtk_ion.h"
 
 static gfp_t high_order_gfp_flags = (GFP_HIGHUSER | __GFP_ZERO | __GFP_NOWARN |
 				     __GFP_NORETRY) & ~__GFP_DIRECT_RECLAIM;
 static gfp_t low_order_gfp_flags  = (GFP_HIGHUSER | __GFP_ZERO | __GFP_NOWARN);
 static const unsigned int orders[] = {8, 4, 0};
 static const int num_orders = ARRAY_SIZE(orders);
+static size_t mm_contig_heap_total_memory;
+
 static int order_to_index(unsigned int order)
 {
 	int i;
@@ -70,8 +73,10 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
 		page = alloc_pages(gfp_flags | __GFP_COMP, order);
 		if (!page)
 			return NULL;
-		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
-						DMA_BIDIRECTIONAL);
+		ion_pages_sync_for_device(g_ion_device->dev.this_device,
+					  page,
+					  PAGE_SIZE << order,
+					  DMA_BIDIRECTIONAL);
 	}
 
 	return page;
@@ -333,6 +338,11 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	unsigned long i;
 	int ret;
 
+	if (mm_contig_heap_total_memory > 1024 * 1024) {
+		IONMSG("ion_system_contig_heap_allocate is too much(%zu)\n", mm_contig_heap_total_memory);
+		return -EINVAL;
+	}
+
 	if (align > (PAGE_SIZE << order))
 		return -EINVAL;
 
@@ -360,7 +370,9 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 
 	buffer->priv_virt = table;
 
-	ion_pages_sync_for_device(NULL, page, len, DMA_BIDIRECTIONAL);
+	ion_pages_sync_for_device(g_ion_device->dev.this_device, page,
+				  len, DMA_BIDIRECTIONAL);
+	mm_contig_heap_total_memory += len;
 
 	return 0;
 
@@ -380,6 +392,7 @@ static void ion_system_contig_heap_free(struct ion_buffer *buffer)
 	unsigned long pages = PAGE_ALIGN(buffer->size) >> PAGE_SHIFT;
 	unsigned long i;
 
+	mm_contig_heap_total_memory -= buffer->size;
 	for (i = 0; i < pages; i++)
 		__free_page(page + i);
 	sg_free_table(table);
@@ -427,7 +440,7 @@ struct ion_heap *ion_system_contig_heap_create(struct ion_platform_heap *unused)
 	if (!heap)
 		return ERR_PTR(-ENOMEM);
 	heap->ops = &kmalloc_ops;
-	heap->type = ION_HEAP_TYPE_SYSTEM_CONTIG;
+	heap->type = ION_HEAP_TYPE_MULTIMEDIA_CONTIG;
 	return heap;
 }
 

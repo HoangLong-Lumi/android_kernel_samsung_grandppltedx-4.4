@@ -450,6 +450,13 @@ struct sock {
 	u32			sk_classid;
 #endif
 	struct cg_proto		*sk_cgrp;
+    /* START_OF_KNOX_VPN */
+    uid_t           knox_uid;
+    pid_t           knox_pid;
+    __be32          inet_src_masq;
+    char domain_name[255];
+    __u64   open_time;
+    /* END_OF_KNOX_VPN */
 	void			(*sk_state_change)(struct sock *sk);
 	void			(*sk_data_ready)(struct sock *sk);
 	void			(*sk_write_space)(struct sock *sk);
@@ -1067,6 +1074,7 @@ struct proto {
 	void			(*destroy_cgroup)(struct mem_cgroup *memcg);
 	struct cg_proto		*(*proto_cgroup)(struct mem_cgroup *memcg);
 #endif
+	int			(*diag_destroy)(struct sock *sk, int err);
 };
 
 int proto_register(struct proto *prot, int alloc_slab);

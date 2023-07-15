@@ -70,6 +70,10 @@
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
 
+#ifdef CONFIG_MTK_EXTMEM
+#include <linux/exm_driver.h>
+#endif
+
 #include "internal.h"
 
 #ifdef LAST_CPUPID_NOT_IN_PAGE_FLAGS
@@ -80,6 +84,11 @@
 /* use the per-pgdat data instead for discontigmem - mbligh */
 unsigned long max_mapnr;
 struct page *mem_map;
+
+#ifdef CONFIG_MTK_MEMCFG
+unsigned long mem_map_size;
+EXPORT_SYMBOL(mem_map_size);
+#endif
 
 EXPORT_SYMBOL(max_mapnr);
 EXPORT_SYMBOL(mem_map);
@@ -1758,11 +1767,18 @@ int remap_pfn_range(struct vm_area_struct *vma, unsigned long addr,
 	 * un-COW'ed pages by matching them up with "vma->vm_pgoff".
 	 * See vm_normal_page() for details.
 	 */
+#ifdef CONFIG_MTK_EXTMEM
+	if (addr == vma->vm_start && end == vma->vm_end)
+		vma->vm_pgoff = pfn;
+	else if (is_cow_mapping(vma->vm_flags))
+		return -EINVAL;
+#else
 	if (is_cow_mapping(vma->vm_flags)) {
 		if (addr != vma->vm_start || end != vma->vm_end)
 			return -EINVAL;
 		vma->vm_pgoff = pfn;
 	}
+#endif
 
 	err = track_pfn_remap(vma, &prot, pfn, addr, PAGE_ALIGN(size));
 	if (err)
@@ -2662,40 +2678,6 @@ out_release:
 }
 
 /*
- * This is like a special single-page "expand_{down|up}wards()",
- * except we must first make sure that 'address{-|+}PAGE_SIZE'
- * doesn't hit another vma.
- */
-static inline int check_stack_guard_page(struct vm_area_struct *vma, unsigned long address)
-{
-	address &= PAGE_MASK;
-	if ((vma->vm_flags & VM_GROWSDOWN) && address == vma->vm_start) {
-		struct vm_area_struct *prev = vma->vm_prev;
-
-		/*
-		 * Is there a mapping abutting this one below?
-		 *
-		 * That's only ok if it's the same stack mapping
-		 * that has gotten split..
-		 */
-		if (prev && prev->vm_end == address)
-			return prev->vm_flags & VM_GROWSDOWN ? 0 : -ENOMEM;
-
-		return expand_downwards(vma, address - PAGE_SIZE);
-	}
-	if ((vma->vm_flags & VM_GROWSUP) && address + PAGE_SIZE == vma->vm_end) {
-		struct vm_area_struct *next = vma->vm_next;
-
-		/* As VM_GROWSDOWN but s/below/above/ */
-		if (next && next->vm_start == address + PAGE_SIZE)
-			return next->vm_flags & VM_GROWSUP ? 0 : -ENOMEM;
-
-		return expand_upwards(vma, address + PAGE_SIZE);
-	}
-	return 0;
-}
-
-/*
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
  * We return with mmap_sem still held, but pte unmapped and unlocked.
@@ -2714,10 +2696,6 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	/* File mapping without ->vm_ops ? */
 	if (vma->vm_flags & VM_SHARED)
 		return VM_FAULT_SIGBUS;
-
-	/* Check if we need to add a guard page to the stack */
-	if (check_stack_guard_page(vma, address) < 0)
-		return VM_FAULT_SIGSEGV;
 
 	/* Use the zero-page for reads */
 	if (!(flags & FAULT_FLAG_WRITE) && !mm_forbids_zeropage(mm)) {
@@ -3029,7 +3007,7 @@ static int do_cow_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (unlikely(anon_vma_prepare(vma)))
 		return VM_FAULT_OOM;
 
-	new_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE, vma, address);
+	new_page = alloc_page_vma(GFP_HIGHUSER_MOVABLE | __GFP_CMA, vma, address);
 	if (!new_page)
 		return VM_FAULT_OOM;
 
@@ -3712,6 +3690,24 @@ static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		ret = get_user_pages(tsk, mm, addr, 1,
 				write, 1, &page, &vma);
 		if (ret <= 0) {
+#ifdef CONFIG_MTK_EXTMEM
+			if (!write) {
+				vma = find_vma(mm, addr);
+				if (!vma || vma->vm_start > addr)
+					break;
+				if (vma->vm_end < addr + len)
+					len = vma->vm_end - addr;
+				if (extmem_in_mspace(vma)) {
+					unsigned long pa = vma->vm_pgoff << PAGE_SHIFT;
+					void *extmem_va =
+						(void *)(get_virt_from_mspace(pa) + (addr - vma->vm_start));
+
+					memcpy(buf, extmem_va, len);
+					buf += len;
+					break;
+				}
+			}
+#endif
 #ifndef CONFIG_HAVE_IOREMAP_PROT
 			break;
 #else

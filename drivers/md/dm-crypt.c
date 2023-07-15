@@ -1134,6 +1134,9 @@ static void clone_init(struct dm_crypt_io *io, struct bio *clone)
 	clone->bi_end_io  = crypt_endio;
 	clone->bi_bdev    = cc->dev->bdev;
 	clone->bi_rw      = io->base_bio->bi_rw;
+#ifdef CONFIG_JOURNAL_DATA_TAG
+	clone->bi_flags   |= io->base_bio->bi_flags & BIO_JOURNAL_TAG_MASK;
+#endif
 }
 
 static int kcryptd_io_read(struct dm_crypt_io *io, gfp_t gfp)
@@ -1864,16 +1867,24 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	}
 
 	ret = -ENOMEM;
-	cc->io_queue = alloc_workqueue("kcryptd_io", WQ_MEM_RECLAIM, 1);
+	cc->io_queue = alloc_workqueue("kcryptd_io",
+				       WQ_HIGHPRI |
+				       WQ_MEM_RECLAIM,
+				       1);
 	if (!cc->io_queue) {
 		ti->error = "Couldn't create kcryptd io queue";
 		goto bad;
 	}
 
 	if (test_bit(DM_CRYPT_SAME_CPU, &cc->flags))
-		cc->crypt_queue = alloc_workqueue("kcryptd", WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM, 1);
+		cc->crypt_queue = alloc_workqueue("kcryptd",
+						  WQ_HIGHPRI |
+						  WQ_MEM_RECLAIM, 1);
 	else
-		cc->crypt_queue = alloc_workqueue("kcryptd", WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM | WQ_UNBOUND,
+		cc->crypt_queue = alloc_workqueue("kcryptd",
+						  WQ_HIGHPRI |
+						  WQ_MEM_RECLAIM |
+						  WQ_UNBOUND,
 						  num_online_cpus());
 	if (!cc->crypt_queue) {
 		ti->error = "Couldn't create kcryptd queue";

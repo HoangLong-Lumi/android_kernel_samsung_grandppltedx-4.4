@@ -2,6 +2,11 @@
 # Makefile for nfc devices
 #
 
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include \
+					-I$(srctree)/drivers/misc/mediatek/include/mt-plat
+
+obj-$(CONFIG_SEC_NFC)		+= sec_nfc.o
+obj-$(CONFIG_ESE_P3_LSI)	+= ese_p3.o
 obj-$(CONFIG_NFC_FDP)		+= fdp/
 obj-$(CONFIG_NFC_PN544)		+= pn544/
 obj-$(CONFIG_NFC_MICROREAD)	+= microread/

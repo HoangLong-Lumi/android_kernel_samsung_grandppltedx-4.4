@@ -31,6 +31,10 @@ obj-$(CONFIG_ATMEL_AIC5_IRQ)	+= irq-atmel-aic-common.o irq-atmel-aic5.o
 obj-$(CONFIG_I8259)			+= irq-i8259.o
 obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
 obj-$(CONFIG_IRQ_MIPS_CPU)		+= irq-mips-cpu.o
+obj-$(CONFIG_MADERA_IRQ)		+= irq-madera.o
+ifeq ($(CONFIG_MADERA_IRQ_CS47L15),y)
+obj-$(CONFIG_MADERA_IRQ)		+= irq-madera-cs47l15.o
+endif
 obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
 obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
 obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
@@ -55,3 +59,12 @@ obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
 obj-$(CONFIG_ARCH_SA1100)		+= irq-sa11x0.o
 obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
 obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
+
+
+# Mediatek solution: EIC
+MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+
+obj-$(CONFIG_MTK_EIC)			+= irq-mtk-eic.o
+obj-$(CONFIG_MTK_INTPOL)		+= irq-mtk-intpol.o

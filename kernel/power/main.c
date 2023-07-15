@@ -16,6 +16,11 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
+#ifdef CONFIG_CPU_FREQ_LIMIT_USERSPACE
+#include <linux/cpufreq.h>
+#include <linux/cpufreq_limit.h>
+#endif
+
 #include "power.h"
 
 DEFINE_MUTEX(pm_mutex);
@@ -529,6 +534,27 @@ power_attr(wake_unlock);
 #endif /* CONFIG_PM_WAKELOCKS */
 #endif /* CONFIG_PM_SLEEP */
 
+#ifdef CONFIG_CPU_FREQ_LIMIT_USERSPACE
+static ssize_t cpufreq_table_show(struct kobject *kobj,
+			struct kobj_attribute *attr, char *buf)
+{
+	ssize_t len = 0;
+	len = cpufreq_limit_get_table(buf);
+
+	return len;
+}
+
+static ssize_t cpufreq_table_store(struct kobject *kobj,
+				struct kobj_attribute *attr,
+				const char *buf, size_t n)
+{
+	pr_err("%s: cpufreq_table is read-only\n", __func__);
+	return -EINVAL;
+}
+
+power_attr(cpufreq_table);
+#endif
+
 #ifdef CONFIG_PM_TRACE
 int pm_trace_enabled;
 
@@ -622,6 +648,9 @@ static struct attribute * g[] = {
 	&pm_print_times_attr.attr,
 	&pm_wakeup_irq_attr.attr,
 #endif
+#endif
+#ifdef CONFIG_CPU_FREQ_LIMIT_USERSPACE
+	&cpufreq_table_attr.attr,
 #endif
 #ifdef CONFIG_FREEZER
 	&pm_freeze_timeout_attr.attr,

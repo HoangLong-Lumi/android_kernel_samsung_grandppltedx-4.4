@@ -566,6 +566,15 @@ config LEDS_SEAD3
 	  This driver can also be built as a module. If so the module
 	  will be called leds-sead3.
 
+config LEDS_ET6312B
+	tristate "LED support for the ET6312B"
+	depends on LEDS_CLASS && OF && I2C
+	help
+	  This option enables support for LEDs connected to the ET6312B
+	  LED driver chip accessed via the I2C bus.
+	  ET6312B has three channel LED driver. By synchronous clock
+	  function, combined operation is possible.
+
 comment "LED driver for blink(1) USB RGB LED is under Special HID drivers (HID_THINGM)"
 
 config LEDS_BLINKM
@@ -604,6 +613,50 @@ config LEDS_VERSATILE
 	help
 	  This option enabled support for the LEDs on the ARM Versatile
 	  and RealView boards. Say Y to enabled these.
+
+config LEDS_S2MU005_RGB
+	tristate "LED driver for S2MU005 controllers"
+	depends on LEDS_CLASS
+	depends on MFD_S2MU005
+	help
+	  This option enables support for LEDs driven by Samsung Electronics
+	  S2MU005 RGB led controller. 
+
+config LEDS_SM5705_RGB
+	tristate "LED driver for SM5705 LED"
+	depends on LEDS_CLASS
+	depends on MFD_SM5705
+	help
+	  This option enables support for RGB LED driver
+	  accessed via the I2C bus.
+	  SM5705 is a fully programmable, constant current
+	  three channel LED driver with flexible control interface.
+
+config FLASHLIGHT
+	bool "Flashlight Support"
+	help
+	  This option enables the led sysfs class in /sys/class/flashlight.
+
+config SM_FLASH_LED
+	tristate "Siliconmitus flash LED driver support"
+	depends on FLASHLIGHT
+	help
+	  Say Y here to enable Siliconmitus's flash LED driver HAL architecture
+
+config LEDS_S2MU005_FLASH
+	tristate "Siliconmitus S2MU005 flash LED driver"
+	depends on SM_FLASH_LED
+	help
+	  A driver for Siliconmitus S2MU005 flash LED
+	  This option enables support for the LEDs on the S2MU005.
+
+config GET_REAR_MODULE_ID
+	tristate "LED support for Rear Camera Module ID from eeprom"
+	depends on SM_FLASH_LED
+	help
+	  This option enable support to get module ID 10bytes from eeprom 0x50
+	  Get access to module ID through rear_cam_moduleid sysfs
+
 
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"

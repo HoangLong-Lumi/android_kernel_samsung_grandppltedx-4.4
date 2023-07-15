@@ -66,6 +66,10 @@ obj-$(CONFIG_LEDS_MENF21BMC)		+= leds-menf21bmc.o
 obj-$(CONFIG_LEDS_KTD2692)		+= leds-ktd2692.o
 obj-$(CONFIG_LEDS_POWERNV)		+= leds-powernv.o
 obj-$(CONFIG_LEDS_SEAD3)		+= leds-sead3.o
+obj-$(CONFIG_LEDS_ET6312B)		+= leds-et6312b.o
+obj-$(CONFIG_LEDS_S2MU005_RGB)		+= leds-s2mu005-rgb.o
+obj-$(CONFIG_LEDS_S2MU005_FLASH)	+= leds_s2mu005.o
+obj-$(CONFIG_LEDS_SM5705_RGB)		+= leds-sm5705-rgb.o
 
 # LED SPI Drivers
 obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o

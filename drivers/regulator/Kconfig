@@ -154,6 +154,24 @@ config REGULATOR_BCM590XX
 	  BCM590xx PMUs. This will enable support for the software
 	  controllable LDO/Switching regulators.
 
+config REGULATOR_MADERA_LDO1
+	tristate "Cirrus Logic Madera codecs LDO1 regulator"
+	depends on MFD_MADERA
+	depends on SND_SOC
+	help
+	  For Cirrus Logic Madera class codecs, if you want to use the
+	  internal LDO1 regulator to supply DCVDD you need to include this
+	  driver. If you are using an external DCVDD regulator or the codec
+	  does not have an LDO1 regulator you do not need this driver.
+
+config REGULATOR_MADERA_MICSUPP
+	tristate "Cirrus Logic Madera codecs mic supply regulator"
+	depends on MFD_MADERA
+	depends on SND_SOC
+	help
+	  Support for the microphone supply regulator on Cirrus Logic
+	  Madera class codecs
+
 config REGULATOR_DA903X
 	tristate "Dialog Semiconductor DA9030/DA9034 regulators"
 	depends on PMIC_DA903X
@@ -453,6 +471,15 @@ config REGULATOR_MT6311
 	  This driver supports the control of different power rails of device
 	  through regulator interface.
 
+config REGULATOR_MT6392
+	tristate "MediaTek MT6392 PMIC"
+	depends on MFD_MT6397
+	help
+	  Say y here to select this option to enable the power regulator of
+	  MediaTek MT6392 PMIC.
+	  This driver supports the control of different power rails of device
+	  through regulator interface.
+
 config REGULATOR_MT6397
 	tristate "MediaTek MT6397 PMIC"
 	depends on MFD_MT6397
@@ -461,6 +488,14 @@ config REGULATOR_MT6397
 	  MediaTek MT6397 PMIC.
 	  This driver supports the control of different power rails of device
 	  through regulator interface.
+
+config REGULATOR_MTK
+	bool "MTK regulator subsystem"
+	help
+	  Say Y here to select this option to enable
+	  mtk_regulator framework.
+	  This framework is for linux and non-linux regulator driver
+	  more easy to use for regulator users.
 
 config REGULATOR_PALMAS
 	tristate "TI Palmas PMIC Regulators"

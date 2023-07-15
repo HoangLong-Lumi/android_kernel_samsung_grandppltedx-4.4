@@ -24,9 +24,17 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 #include <linux/console.h>
+#include <linux/sec_debug.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
+
+DECLARE_PER_CPU(unsigned char, coreregs_stored);
+DECLARE_PER_CPU(struct pt_regs, sec_aarch64_core_reg);
+DECLARE_PER_CPU(sec_debug_mmu_reg_t, sec_aarch64_mmu_reg);
+
+/* Machine specific panic information string */
+char *mach_panic_string;
 
 int panic_on_oops = CONFIG_PANIC_ON_OOPS_VALUE;
 static unsigned long tainted_mask;
@@ -73,6 +81,7 @@ void panic(const char *fmt, ...)
 {
 	static DEFINE_SPINLOCK(panic_lock);
 	static char buf[1024];
+	struct pt_regs fixed_regs, pv_regs;
 	va_list args;
 	long i, i_next = 0;
 	int state = 0;
@@ -121,6 +130,16 @@ void panic(const char *fmt, ...)
 	if (!crash_kexec_post_notifiers)
 		crash_kexec(NULL);
 
+	if (!__this_cpu_read(coreregs_stored)) {
+		crash_setup_regs(&fixed_regs, NULL);
+		crash_save_vmcoreinfo();
+		crash_save_cpu(&fixed_regs, smp_processor_id());
+		pv_regs = fixed_regs;
+		sec_debug_save_mmu_reg(&per_cpu(sec_aarch64_mmu_reg, smp_processor_id()));
+		sec_debug_save_core_reg(&pv_regs);
+		__this_cpu_inc(coreregs_stored);
+		pr_emerg("context saved(CPU:%d)[%s,%d]\n", smp_processor_id(), __func__, __LINE__);
+	}
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
 	 * unfortunately means it may not be hardened to work in a panic
@@ -161,6 +180,12 @@ void panic(const char *fmt, ...)
 
 	if (!panic_blink)
 		panic_blink = no_blink;
+
+	LAST_RR_MEMCPY(panic_str, buf, PANIC_STRBUF_LEN);
+	if (!strcmp(fmt, "Crash Key"))
+		sec_dump_task_info();
+
+	wdt_arch_reset(1);
 
 	if (panic_timeout > 0) {
 		/*
@@ -412,6 +437,11 @@ late_initcall(init_oops_id);
 void print_oops_end_marker(void)
 {
 	init_oops_id();
+
+	if (mach_panic_string)
+		printk(KERN_WARNING "Board Information: %s\n",
+		       mach_panic_string);
+
 	pr_warn("---[ end trace %016llx ]---\n", (unsigned long long)oops_id);
 }
 
@@ -503,8 +533,11 @@ EXPORT_SYMBOL(warn_slowpath_null);
  */
 __visible void __stack_chk_fail(void)
 {
+/*
 	panic("stack-protector: Kernel stack is corrupted in: %p\n",
 		__builtin_return_address(0));
+*/
+	BUG();
 }
 EXPORT_SYMBOL(__stack_chk_fail);
 

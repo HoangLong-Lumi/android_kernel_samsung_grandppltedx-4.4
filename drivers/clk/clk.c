@@ -3051,6 +3051,42 @@ int of_clk_get_parent_count(struct device_node *np)
 }
 EXPORT_SYMBOL_GPL(of_clk_get_parent_count);
 
+#ifdef CONFIG_SEC_PM
+static void clock_debug_print_clock(struct clk_core *c, int level)
+{
+	struct clk_core *child;
+
+	if (!c || !c->enable_count)
+		return ;
+
+	pr_info("%*s%-*s %11d %12d %11lu %10lu %-3d\n",
+		   level * 3 + 1, "",
+		   30 - level * 3, c->name,
+		   c->enable_count, c->prepare_count, clk_core_get_rate(c),
+		   clk_core_get_accuracy(c), clk_core_get_phase(c));
+
+	hlist_for_each_entry(child, &c->children, child_node)
+		clock_debug_print_clock(child, level + 1);
+}
+
+void clock_debug_print_enabled(void)
+{
+	struct clk_core *c;
+	struct hlist_head **lists = (struct hlist_head **)all_lists;
+
+	pr_info("   clock                         enable_cnt  prepare_cnt        rate   accuracy   phase\n");
+	pr_info("----------------------------------------------------------------------------------------\n");
+
+	clk_prepare_lock();
+
+	for (; *lists; lists++)
+		hlist_for_each_entry(c, *lists, child_node)
+			clock_debug_print_clock(c, 0);
+
+	clk_prepare_unlock();
+}
+#endif
+
 const char *of_clk_get_parent_name(struct device_node *np, int index)
 {
 	struct of_phandle_args clkspec;

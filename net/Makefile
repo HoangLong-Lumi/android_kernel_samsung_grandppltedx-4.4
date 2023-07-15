@@ -4,6 +4,7 @@
 # 2 Sep 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
+subdir-ccflags-y += -Werror
 
 obj-$(CONFIG_NET)		:= socket.o core/
 
@@ -77,3 +78,5 @@ endif
 ifneq ($(CONFIG_NET_L3_MASTER_DEV),)
 obj-y				+= l3mdev/
 endif
+obj-$(CONFIG_KNOX_NCM)	+= ncm/
+

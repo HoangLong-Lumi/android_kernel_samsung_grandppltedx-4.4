@@ -36,12 +36,15 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 #include <trace/events/cma.h>
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
 
 #include "cma.h"
 
 struct cma cma_areas[MAX_CMA_AREAS];
 unsigned cma_area_count;
 static DEFINE_MUTEX(cma_mutex);
+static unsigned long cma_usage;
 
 phys_addr_t cma_get_base(const struct cma *cma)
 {
@@ -51,6 +54,30 @@ phys_addr_t cma_get_base(const struct cma *cma)
 unsigned long cma_get_size(const struct cma *cma)
 {
 	return cma->count << PAGE_SHIFT;
+}
+
+/* Get all cma range */
+void cma_get_range(phys_addr_t *base, phys_addr_t *size)
+{
+	int i;
+	unsigned long base_pfn = ULONG_MAX, max_pfn = 0;
+
+	for (i = 0; i < cma_area_count; i++) {
+		struct cma *cma = &cma_areas[i];
+
+		if (cma->base_pfn < base_pfn)
+			base_pfn = cma->base_pfn;
+
+		if (cma->base_pfn + cma->count > max_pfn)
+			max_pfn = cma->base_pfn + cma->count;
+	}
+
+	if (max_pfn) {
+		*base = PFN_PHYS(base_pfn);
+		*size = PFN_PHYS(max_pfn) - PFN_PHYS(base_pfn);
+	} else {
+		*base = *size = 0;
+	}
 }
 
 static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
@@ -141,6 +168,34 @@ err:
 	cma->count = 0;
 	return -EINVAL;
 }
+
+#ifdef CONFIG_ZONE_MOVABLE_CMA
+void cma_resize_front(struct cma *cma, unsigned long nr_pfn)
+{
+	cma->base_pfn += nr_pfn;
+	cma->count    -= nr_pfn;
+	totalcma_pages -= nr_pfn;
+}
+
+int cma_alloc_range_ok(struct cma *cma, int count, int align)
+{
+	unsigned long mask, offset;
+	unsigned long bitmap_maxno, bitmap_no, bitmap_count;
+
+	mask = cma_bitmap_aligned_mask(cma, align);
+	offset = cma_bitmap_aligned_offset(cma, align);
+	bitmap_maxno = cma_bitmap_maxno(cma);
+	bitmap_count = cma_bitmap_pages_to_bits(cma, count);
+
+	bitmap_no = bitmap_find_next_zero_area_off(cma->bitmap,
+			bitmap_maxno, 0, bitmap_count, mask,
+			offset);
+
+	if (bitmap_no >= bitmap_maxno)
+		return false;
+	return true;
+}
+#endif
 
 static int __init cma_init_reserved_areas(void)
 {
@@ -406,6 +461,11 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
 		mutex_unlock(&cma_mutex);
 		if (ret == 0) {
+
+			mutex_lock(&cma_mutex);
+			cma_usage += count;
+			mutex_unlock(&cma_mutex);
+
 			page = pfn_to_page(pfn);
 			break;
 		}
@@ -456,5 +516,51 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
 	cma_clear_bitmap(cma, pfn, count);
 	trace_cma_release(pfn, pages, count);
 
+	mutex_lock(&cma_mutex);
+	cma_usage -= count;
+	mutex_unlock(&cma_mutex);
+
 	return true;
 }
+
+static int cma_usage_show(struct seq_file *m, void *v)
+{
+	unsigned char *fmt = "%-10s: %10lu kB\n";
+
+	seq_printf(m, fmt, "CMA usage", cma_usage*4);
+
+	return 0;
+}
+
+static int cma_usage_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, &cma_usage_show, NULL);
+}
+
+static const struct file_operations memory_ssvp_fops = {
+	.open		= cma_usage_open,
+	.read		= seq_read,
+	.release	= single_release,
+};
+
+/**
+ * Provide CMA memory allocation usage
+ * cat /sys/kernel/debug/cmainfo
+ */
+static int __init cma_debug_init(void)
+{
+	int ret = 0;
+
+	struct dentry *dentry;
+
+	dentry = debugfs_create_file("cmainfo", S_IRUGO, NULL, NULL,
+					&memory_ssvp_fops);
+	if (!dentry)
+		pr_warn("Failed to create debugfs cmainfo file\n");
+	else
+		pr_info("cma usage create success.");
+
+	return ret;
+}
+
+late_initcall(cma_debug_init);

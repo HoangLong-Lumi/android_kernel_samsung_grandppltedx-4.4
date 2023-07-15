@@ -56,6 +56,8 @@
 #include <linux/random.h>
 #include <linux/trace_events.h>
 #include <linux/suspend.h>
+#include <linux/ftrace.h>
+#include <linux/sec_debug.h>
 
 #include "tree.h"
 #include "rcu.h"
@@ -1252,6 +1254,7 @@ static void print_other_cpu_stall(struct rcu_state *rsp, unsigned long gpnum)
 	 * See Documentation/RCU/stallwarn.txt for info on how to debug
 	 * RCU CPU stall warnings.
 	 */
+	sec_save_context(_THIS_CPU, NULL);
 	pr_err("INFO: %s detected stalls on CPUs/tasks:",
 	       rsp->name);
 	print_cpu_stall_info_begin();
@@ -1313,6 +1316,7 @@ static void print_cpu_stall(struct rcu_state *rsp)
 	 * See Documentation/RCU/stallwarn.txt for info on how to debug
 	 * RCU CPU stall warnings.
 	 */
+	sec_save_context(_THIS_CPU, NULL);
 	pr_err("INFO: %s self-detected stall on CPU", rsp->name);
 	print_cpu_stall_info_begin();
 	print_cpu_stall_info(rsp, smp_processor_id());
@@ -1611,7 +1615,7 @@ static void rcu_gp_kthread_wake(struct rcu_state *rsp)
 	    !READ_ONCE(rsp->gp_flags) ||
 	    !rsp->gp_kthread)
 		return;
-	wake_up(&rsp->gp_wq);
+	swake_up(&rsp->gp_wq);
 }
 
 /*
@@ -2076,7 +2080,7 @@ static int __noreturn rcu_gp_kthread(void *arg)
 					       READ_ONCE(rsp->gpnum),
 					       TPS("reqwait"));
 			rsp->gp_state = RCU_GP_WAIT_GPS;
-			wait_event_interruptible(rsp->gp_wq,
+			swait_event_interruptible(rsp->gp_wq,
 						 READ_ONCE(rsp->gp_flags) &
 						 RCU_GP_FLAG_INIT);
 			rsp->gp_state = RCU_GP_DONE_GPS;
@@ -2106,7 +2110,7 @@ static int __noreturn rcu_gp_kthread(void *arg)
 					       READ_ONCE(rsp->gpnum),
 					       TPS("fqswait"));
 			rsp->gp_state = RCU_GP_WAIT_FQS;
-			ret = wait_event_interruptible_timeout(rsp->gp_wq,
+			ret = swait_event_interruptible_timeout(rsp->gp_wq,
 					rcu_gp_fqs_check_wake(rsp, &gf), j);
 			rsp->gp_state = RCU_GP_DOING_FQS;
 			/* Locking provides needed memory barriers. */
@@ -2230,7 +2234,7 @@ static void rcu_report_qs_rsp(struct rcu_state *rsp, unsigned long flags)
 	WARN_ON_ONCE(!rcu_gp_in_progress(rsp));
 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
 	raw_spin_unlock_irqrestore(&rcu_get_root(rsp)->lock, flags);
-	rcu_gp_kthread_wake(rsp);
+	swake_up(&rsp->gp_wq);  /* Memory barrier implied by swake_up() path. */	
 }
 
 /*
@@ -2657,6 +2661,10 @@ static void rcu_do_batch(struct rcu_state *rsp, struct rcu_data *rdp)
 	struct rcu_head *next, *list, **tail;
 	long bl, count, count_lazy;
 	int i;
+#ifdef CONFIG_MTK_RCU_MONITOR
+	struct rcu_invoke_log_entry *e = NULL;
+	ktime_t start, end;
+#endif
 
 	/* If no callbacks are ready, just return. */
 	if (!cpu_has_callbacks_ready_to_invoke(rdp)) {
@@ -2683,6 +2691,9 @@ static void rcu_do_batch(struct rcu_state *rsp, struct rcu_data *rdp)
 		if (rdp->nxttail[i] == rdp->nxttail[RCU_DONE_TAIL])
 			rdp->nxttail[i] = &rdp->nxtlist;
 	local_irq_restore(flags);
+#ifdef CONFIG_MTK_RCU_MONITOR
+	start = ktime_get();
+#endif
 
 	/* Invoke callbacks. */
 	count = count_lazy = 0;
@@ -2690,6 +2701,18 @@ static void rcu_do_batch(struct rcu_state *rsp, struct rcu_data *rdp)
 		next = list->next;
 		prefetch(next);
 		debug_rcu_head_unqueue(list);
+#ifdef CONFIG_MTK_RCU_MONITOR
+		e = rcu_invoke_log_add();
+		if (e != NULL) {
+			strcpy(e->rcuname, rsp->name);
+			e->rhp = (unsigned long)list;
+			e->func = (unsigned long)list->func;
+			e->gpnum = rsp->gpnum;
+			e->qlen = rdp->qlen;
+			e->time_start = start;
+			e->timestamp = ktime_get();
+		}
+#endif
 		if (__rcu_reclaim(rsp->name, list))
 			count_lazy++;
 		list = next;
@@ -2699,6 +2722,11 @@ static void rcu_do_batch(struct rcu_state *rsp, struct rcu_data *rdp)
 		     (!is_idle_task(current) && !rcu_is_callbacks_kthread())))
 			break;
 	}
+#ifdef CONFIG_MTK_RCU_MONITOR
+	end = ktime_get();
+	if (e != NULL)
+		e->time_dur = ktime_to_us(ktime_sub(end, start));
+#endif
 
 	local_irq_save(flags);
 	trace_rcu_batch_end(rsp->name, count, !!list, need_resched(),
@@ -2891,7 +2919,7 @@ static void force_quiescent_state(struct rcu_state *rsp)
 	}
 	WRITE_ONCE(rsp->gp_flags, READ_ONCE(rsp->gp_flags) | RCU_GP_FLAG_FQS);
 	raw_spin_unlock_irqrestore(&rnp_old->lock, flags);
-	rcu_gp_kthread_wake(rsp);
+	swake_up(&rsp->gp_wq);  /* Memory barrier implied by swake_up() path. */
 }
 
 /*
@@ -3042,6 +3070,9 @@ __call_rcu(struct rcu_head *head, rcu_callback_t func,
 {
 	unsigned long flags;
 	struct rcu_data *rdp;
+#ifdef CONFIG_MTK_RCU_MONITOR
+	struct rcu_callback_log_entry *e;
+#endif
 
 	WARN_ON_ONCE((unsigned long)head & 0x1); /* Misaligned rcu_head! */
 	if (debug_rcu_head_queue(head)) {
@@ -3093,7 +3124,19 @@ __call_rcu(struct rcu_head *head, rcu_callback_t func,
 	smp_mb();  /* Count before adding callback for rcu_barrier(). */
 	*rdp->nxttail[RCU_NEXT_TAIL] = head;
 	rdp->nxttail[RCU_NEXT_TAIL] = &head->next;
-
+#ifdef CONFIG_MTK_RCU_MONITOR
+	e = rcu_callback_log_add();
+	if (e != NULL) {
+		strcpy(e->rcuname, rsp->name);
+		strcpy(e->comm, current->comm);
+		e->rhp = (unsigned long)head;
+		e->func = (unsigned long)func;
+		e->gpnum = rsp->gpnum;
+		e->qlen = rdp->qlen;
+		e->ip = CALLER_ADDR1;
+		e->time = ktime_get();
+	}
+#endif
 	if (__is_kfree_rcu_offset((unsigned long)func))
 		trace_rcu_kfree_callback(rsp->name, head, (unsigned long)func,
 					 rdp->qlen_lazy, rdp->qlen);
@@ -3524,7 +3567,7 @@ static void __rcu_report_exp_rnp(struct rcu_state *rsp, struct rcu_node *rnp,
 			raw_spin_unlock_irqrestore(&rnp->lock, flags);
 			if (wake) {
 				smp_mb(); /* EGP done before wake_up(). */
-				wake_up(&rsp->expedited_wq);
+				swake_up(&rsp->expedited_wq);
 			}
 			break;
 		}
@@ -3781,7 +3824,7 @@ static void synchronize_sched_expedited_wait(struct rcu_state *rsp)
 	jiffies_start = jiffies;
 
 	for (;;) {
-		ret = wait_event_interruptible_timeout(
+		ret = swait_event_timeout(
 				rsp->expedited_wq,
 				sync_rcu_preempt_exp_done(rnp_root),
 				jiffies_stall);
@@ -3789,7 +3832,7 @@ static void synchronize_sched_expedited_wait(struct rcu_state *rsp)
 			return;
 		if (ret < 0) {
 			/* Hit a signal, disable CPU stall warnings. */
-			wait_event(rsp->expedited_wq,
+			swait_event(rsp->expedited_wq,
 				   sync_rcu_preempt_exp_done(rnp_root));
 			return;
 		}
@@ -4455,8 +4498,8 @@ static void __init rcu_init_one(struct rcu_state *rsp,
 		}
 	}
 
-	init_waitqueue_head(&rsp->gp_wq);
-	init_waitqueue_head(&rsp->expedited_wq);
+	init_swait_queue_head(&rsp->gp_wq);
+	init_swait_queue_head(&rsp->expedited_wq);
 	rnp = rsp->level[rcu_num_lvls - 1];
 	for_each_possible_cpu(i) {
 		while (i > rnp->grphi)

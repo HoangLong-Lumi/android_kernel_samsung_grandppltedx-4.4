@@ -41,6 +41,11 @@
 #include <asm/stacktrace.h>
 #include <asm/exception.h>
 #include <asm/system_misc.h>
+#include <mt-plat/mtk_hooks.h>
+
+#ifdef CONFIG_SEC_DEBUG
+#include <linux/sec_debug.h>
+#endif
 
 static const char *handler[]= {
 	"Synchronous Abort",
@@ -255,6 +260,11 @@ void die(const char *str, struct pt_regs *regs, int err)
 	raw_spin_unlock_irq(&die_lock);
 	oops_exit();
 
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
+	sec_debug_set_extra_info_backtrace(regs);
+	sec_debug_show_hotplugfail_cnt();
+#endif
+
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 	if (panic_on_oops)
@@ -301,11 +311,13 @@ static int call_undef_hook(struct pt_regs *regs)
 	struct undef_hook *hook;
 	unsigned long flags;
 	u32 instr;
-	int (*fn)(struct pt_regs *regs, u32 instr) = NULL;
+	int (*fn)(struct pt_regs *regs, u32 instr) = arm_undefinstr_retry;
 	void __user *pc = (void __user *)instruction_pointer(regs);
 
-	if (!user_mode(regs))
-		return 1;
+	if (!user_mode(regs)) {
+		instr = *(u32 *)pc;
+		return fn ? fn(regs, instr) : 1;
+	}
 
 	if (compat_thumb_mode(regs)) {
 		/* 16-bit Thumb instruction */
@@ -355,6 +367,11 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
 			current->comm, task_pid_nr(current), pc);
 		dump_instr(KERN_INFO, regs);
 	}
+
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
+	if (!user_mode(regs))
+		sec_debug_set_extra_info_fault(-1, regs);
+#endif
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
@@ -433,6 +450,19 @@ const char *esr_get_class_string(u32 esr)
 	return esr_class_str[esr >> ESR_ELx_EC_SHIFT];
 }
 
+#ifdef CONFIG_MEDIATEK_SOLUTION
+static void (*async_abort_handler)(struct pt_regs *regs, void *);
+static void *async_abort_priv;
+
+int register_async_abort_handler(void (*fn)(struct pt_regs *regs, void *), void *priv)
+{
+	async_abort_handler = fn;
+	async_abort_priv = priv;
+
+	return 0;
+}
+#endif
+
 /*
  * bad_mode handles the impossible case in the exception vector.
  */
@@ -442,9 +472,25 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
 	void __user *pc = (void __user *)instruction_pointer(regs);
 	console_verbose();
 
+#ifdef CONFIG_MEDIATEK_SOLUTION
+	/*
+	 * reason is defined in entry.S, 3 means BAD_ERROR,
+	 * which would be triggered by async abort
+	 */
+	if ((reason == 3) && async_abort_handler)
+		async_abort_handler(regs, async_abort_priv);
+#endif
+
 	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
 		handler[reason], esr, esr_get_class_string(esr));
 	__show_regs(regs);
+
+#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
+	if (!user_mode(regs)) {
+		sec_debug_set_extra_info_fault(SEC_DEBUG_BADMODE_MAGIC, regs);
+		sec_debug_set_extra_info_esr(esr);
+	}
+#endif
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
