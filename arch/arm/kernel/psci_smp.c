@@ -24,6 +24,10 @@
 #include <asm/psci.h>
 #include <asm/smp_plat.h>
 
+#if defined(CONFIG_MACH_MT6735)
+#include <mt-smp.h>
+#endif
+
 /*
  * psci_smp assumes that the following is true about PSCI:
  *
@@ -51,10 +55,30 @@ extern void secondary_startup(void);
 
 static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
+#if defined(CONFIG_MACH_MT6735)
+	int ret = -1;
+
+	if (psci_ops.cpu_on)
+		ret = psci_ops.cpu_on(cpu_logical_map(cpu),
+				       __pa(secondary_startup));
+
+	if (ret < 0) {
+		pr_err("psci cpu_on failed\n");
+		return -ENODEV;
+	}
+
+	ret = mt_smp_boot_secondary(cpu, idle);
+	if (ret < 0) {
+		pr_err("mt_smp_boot_secondary failed\n");
+		return -ENODEV;
+	}
+	return 0;
+#else
 	if (psci_ops.cpu_on)
 		return psci_ops.cpu_on(cpu_logical_map(cpu),
 					virt_to_idmap(&secondary_startup));
 	return -ENODEV;
+#endif
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -83,6 +107,12 @@ void psci_cpu_die(unsigned int cpu)
 	panic("psci: cpu %d failed to shutdown\n", cpu);
 }
 
+#if defined(CONFIG_MACH_MT6735)
+int __ref psci_cpu_kill(unsigned int cpu)
+{
+	return mt_cpu_kill(cpu);
+}
+#else
 int psci_cpu_kill(unsigned int cpu)
 {
 	int err, i;
@@ -111,6 +141,7 @@ int psci_cpu_kill(unsigned int cpu)
 	/* Make platform_cpu_kill() fail. */
 	return 0;
 }
+#endif
 
 #endif
 
@@ -121,7 +152,13 @@ bool __init psci_smp_available(void)
 }
 
 struct smp_operations __initdata psci_smp_ops = {
+#if defined(CONFIG_MACH_MT6735)
+	.smp_prepare_cpus       = mt_smp_prepare_cpus,
+#endif
 	.smp_boot_secondary	= psci_boot_secondary,
+#if defined(CONFIG_MACH_MT6735)
+	.smp_secondary_init     = mt_smp_secondary_init,
+#endif
 #ifdef CONFIG_HOTPLUG_CPU
 	.cpu_disable		= psci_cpu_disable,
 	.cpu_die		= psci_cpu_die,
