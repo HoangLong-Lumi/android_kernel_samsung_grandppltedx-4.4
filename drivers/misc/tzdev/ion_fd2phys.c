@@ -55,7 +55,7 @@ struct ionfd2phys32 {
 extern struct ion_device *ion_exynos;
 #elif defined(CONFIG_ARCH_WHALE) || defined(CONFIG_ARCH_RANCHU)
 extern struct ion_device *idev;
-#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_ARCH_MT6735) || defined(CONFIG_MACH_MT6757)
+#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6757)
 extern struct ion_device *g_ion_device;
 #endif
 
@@ -222,7 +222,7 @@ static ssize_t system_heap_id_show(struct device *dev, struct device_attribute *
 	 * is zero */
 #define ION_HEAP_TYPE_SYSTEM_MT6755 (1)
 	return sprintf(buf, "%d\n", ION_HEAP_TYPE_SYSTEM_MT6755);
-#elif defined(CONFIG_ARCH_MT6735)
+#elif defined(CONFIG_MACH_MT6735)
 	/* This is dirty hack for MT6735 platform. This platform does
 	 * not have ion_system_heap. Instead, ion_mm_heap should be used,
 	 * which is listed in a separate platform-specific enum, and has type
@@ -253,13 +253,13 @@ static int __init ionfd2phys_init(void)
 	struct ion_device *ion_dev = ion_exynos;
 #elif defined(CONFIG_ARCH_WHALE) || defined(CONFIG_ARCH_RANCHU)
 	struct ion_device *ion_dev = idev;
-#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_ARCH_MT6735) || defined(CONFIG_MACH_MT6757)
+#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6757)
 	struct ion_device *ion_dev = g_ion_device;
 #endif
 	pr_devel("module init\n");
 
 #if defined(CONFIG_ARCH_EXYNOS) || defined(CONFIG_ARCH_WHALE) || defined(CONFIG_ARCH_MT6755) \
- || defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_RANCHU) || defined(CONFIG_MACH_MT6757)
+ || defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_RANCHU) || defined(CONFIG_MACH_MT6757)
 	if (!ion_dev) {
 		pr_err("Failed to get ion device\n");
 		return 0;

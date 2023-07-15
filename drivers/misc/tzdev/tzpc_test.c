@@ -33,7 +33,7 @@
 #elif defined(CONFIG_ARCH_WHALE)
 #define MAP_ADDRESS	0x10830000
 #define MAP_SIZE	0x1000
-#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_ARCH_MT6735) || defined(CONFIG_MACH_MT6757)
+#elif defined(CONFIG_ARCH_MT6755) || defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6757)
 #define MAP_ADDRESS	0x1100A000
 #define MAP_SIZE	0x1000
 #endif
