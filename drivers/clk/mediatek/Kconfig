@@ -12,6 +12,20 @@ config COMMON_CLK_MEDIATEK_V1
 	---help---
 	  An older version (V1) of Mediatek clock common code support.
 
+config COMMON_CLK_MEDIATEK_V1_MT6735
+	bool
+	select COMMON_CLK_MEDIATEK
+	---help---
+	  An older version (V1) of Mediatek clock common code support.
+
+config COMMON_CLK_MT6735
+	bool "Clock driver for Mediatek MT6735"
+	depends on COMMON_CLK
+	select COMMON_CLK_MEDIATEK_V1_MT6735
+	default y if MACH_MT6735 && !MTK_CLKMGR
+	---help---
+	  This driver supports Mediatek MT6735 clocks.
+
 config COMMON_CLK_MT6757
 	bool "Clock driver for Mediatek MT6757"
 	depends on COMMON_CLK
